@@ -590,6 +590,7 @@ proact  = esc('${PROACTIVE}')
 ctx     = esc('${CTX}')
 chat_id = '${TELEGRAM_CHAT_ID}'
 mcp_url = '${N8N_URL_FOR_MCP}'
+tz      = esc('${TIMEZONE:-Europe/Berlin}')
 uname   = user.lower().replace(' ', '_')
 
 sql = f"""
@@ -603,7 +604,7 @@ INSERT INTO public.soul (key, content) VALUES
 ON CONFLICT (key) DO UPDATE SET content = EXCLUDED.content;
 
 INSERT INTO public.user_profiles (user_id, name, display_name, timezone, context, setup_done, setup_step)
-VALUES ('telegram:{chat_id}', '{uname}', '{user}', 'UTC', '{ctx}', true, 5)
+VALUES ('telegram:{chat_id}', '{uname}', '{user}', '{tz}', '{ctx}', true, 5)
 ON CONFLICT (user_id) DO UPDATE SET
   display_name = EXCLUDED.display_name, context = EXCLUDED.context, setup_done = true;
 
