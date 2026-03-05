@@ -334,9 +334,17 @@ fi
 
 # ── 9. Apply DB schema ───────────────────────────────────────
 echo -e "\n${GREEN}🗄️  Applying database schema...${NC}"
-LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres \
-  -f supabase/migrations/001_schema.sql > /dev/null 2>&1
+SCHEMA_OUTPUT=$(LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres \
+  -f supabase/migrations/001_schema.sql 2>&1)
+SCHEMA_ERRORS=$(echo "$SCHEMA_OUTPUT" | grep -i "error" | head -5)
+if [ -n "$SCHEMA_ERRORS" ]; then
+  echo -e "  ${YELLOW}⚠️  Schema warnings:${NC}"
+  echo "$SCHEMA_ERRORS" | while read line; do echo "    $line"; done
+fi
 echo "  ✅ Schema applied"
+
+# Reload PostgREST schema cache so new tables are immediately available via API
+docker kill --signal=SIGUSR1 $(docker ps -q --filter name=rest) 2>/dev/null || true
 
 N8N_BASE="${N8N_URL:-http://localhost:5678}"
 ANTHROPIC_CRED_ID="${ANTHROPIC_CRED_ID:-REPLACE_WITH_YOUR_CREDENTIAL_ID}"

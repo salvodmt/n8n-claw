@@ -20,6 +20,7 @@ SET row_security = off;
 -- Required extensions (n8n migrations need uuid_generate_v4)
 --
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 --
 -- Name: public; Type: SCHEMA; Schema: -; Owner: pg_database_owner
@@ -678,7 +679,7 @@ CREATE INDEX idx_memory_long_category ON public.memory_long USING btree (categor
 -- Name: idx_memory_long_embedding; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_memory_long_embedding ON public.memory_long USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='100');
+CREATE INDEX IF NOT EXISTS idx_memory_long_embedding ON public.memory_long USING hnsw (embedding public.vector_cosine_ops);
 
 
 --
@@ -959,6 +960,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
     CREATE ROLE service_role NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
   END IF;
 END $$;
 GRANT ALL ON SCHEMA public TO supabase_admin;
