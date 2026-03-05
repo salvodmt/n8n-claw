@@ -231,3 +231,5 @@ docker logs -f n8n-claw
 | PostgREST instead of full Supabase | Lighter, no `supabase_admin` dependencies except Studio |
 | `toolWorkflow` over `toolCode` for tools | More reliable parameter passing via `$json` |
 | `172.17.0.1` for internal service URLs | Docker containers can't reach `localhost` |
+
+---
