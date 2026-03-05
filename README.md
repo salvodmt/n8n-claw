@@ -54,6 +54,7 @@ The script will:
    - Agent name
    - Your name
    - Preferred language
+   - Timezone *(auto-detected from system)*
    - Communication style (casual / professional / friendly)
    - Proactive vs reactive behavior
    - Free-text custom persona *(overrides the above)*
@@ -181,6 +182,31 @@ Point your domain's DNS A record to the VPS IP before running this.
 
 ---
 
+## Updating
+
+Re-run `setup.sh` at any time to update:
+
+```bash
+cd n8n-claw && git pull && ./setup.sh
+```
+
+In update mode, the script will:
+- **Pull latest Docker images** (n8n, PostgreSQL, etc.)
+- **Restart all services** with the new images
+- **Preserve your encryption key** — automatically recovered from the existing volume
+- **Skip personalization** — your agent's name, personality, and timezone are kept
+- **Skip credential creation and workflow import** — nothing is duplicated
+
+To **reconfigure** your agent's personality, timezone, or other settings:
+
+```bash
+./setup.sh --force
+```
+
+This re-runs the full setup wizard while keeping your existing data and credentials.
+
+---
+
 ## Troubleshooting
 
 **Agent not responding to Telegram messages?**
@@ -191,6 +217,9 @@ Point your domain's DNS A record to the VPS IP before running this.
 
 **MCP Builder fails?**
 → Make sure the LLM node in MCP Builder has Anthropic API selected
+
+**Agent shows wrong time?**
+→ Re-run `./setup.sh --force` and set the correct timezone, or update it directly in `user_profiles` table via Supabase Studio
 
 **DB empty / Load Soul returns nothing?**
 → Re-run seed: `./setup.sh` (skips already-set config)
