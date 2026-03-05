@@ -111,7 +111,7 @@ ask() {
 # In update mode: recover encryption key from existing Docker volume
 if [ "$INSTALL_MODE" = "update" ]; then
   VOLUME_KEY=$(docker run --rm -v n8n-claw_n8n_data:/data alpine \
-    cat /data/.n8n/config 2>/dev/null | grep -o '"encryptionKey":"[^"]*"' | cut -d'"' -f4)
+    cat /data/config /data/.n8n/config 2>/dev/null | grep -o '"encryptionKey":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [ -n "$VOLUME_KEY" ]; then
     N8N_ENCRYPTION_KEY="$VOLUME_KEY"
     set_env "N8N_ENCRYPTION_KEY" "$N8N_ENCRYPTION_KEY"
