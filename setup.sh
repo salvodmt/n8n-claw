@@ -722,6 +722,8 @@ EXISTING_TZ=$(LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U
   "SELECT timezone FROM user_profiles WHERE user_id = 'telegram:${TELEGRAM_CHAT_ID}' LIMIT 1" 2>/dev/null | xargs)
 EXISTING_CTX=$(LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -t -c \
   "SELECT context FROM user_profiles WHERE user_id = 'telegram:${TELEGRAM_CHAT_ID}' LIMIT 1" 2>/dev/null | xargs)
+EXISTING_LANG=$(LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -t -c \
+  "SELECT preferences->>'language' FROM user_profiles WHERE user_id = 'telegram:${TELEGRAM_CHAT_ID}' LIMIT 1" 2>/dev/null | xargs)
 
 echo -e "\n${GREEN}🧙 Personalization setup${NC}"
 echo "────────────────────────────"
@@ -734,7 +736,7 @@ echo ""
 SYS_TZ=$(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo "UTC")
 BOT_NAME=$(cli_ask "Agent name" "${EXISTING_BOT_NAME:-Assistant}")
 USER_DISPLAY=$(cli_ask "Your name" "${EXISTING_USER:-User}")
-LANG=$(cli_ask "Preferred language" "English")
+PREFERRED_LANG=$(cli_ask "Preferred language" "${EXISTING_LANG:-English}")
 CTX=$(cli_ask "What will you use this agent for" "${EXISTING_CTX:-Personal assistant and automation}")
 TIMEZONE=$(cli_ask "Timezone" "${EXISTING_TZ:-$SYS_TZ}")
 
@@ -830,7 +832,7 @@ def esc(s):
 
 bot     = esc('${BOT_NAME}')
 user    = esc('${USER_DISPLAY}')
-lang    = esc('${LANG}')
+lang    = esc('${PREFERRED_LANG}')
 style   = esc('${STYLE}')
 proact  = esc('${PROACTIVE}')
 ctx     = esc('${CTX}')
@@ -849,10 +851,12 @@ INSERT INTO public.soul (key, content) VALUES
   ('communication', 'You communicate via Telegram. Reply directly.')
 ON CONFLICT (key) DO UPDATE SET content = EXCLUDED.content;
 
-INSERT INTO public.user_profiles (user_id, name, display_name, timezone, context, setup_done, setup_step)
-VALUES ('telegram:{chat_id}', '{uname}', '{user}', '{tz}', '{ctx}', true, 5)
+INSERT INTO public.user_profiles (user_id, name, display_name, timezone, context, preferences, setup_done, setup_step)
+VALUES ('telegram:{chat_id}', '{uname}', '{user}', '{tz}', '{ctx}', '{{"language": "{lang}"}}'::jsonb, true, 5)
 ON CONFLICT (user_id) DO UPDATE SET
-  display_name = EXCLUDED.display_name, context = EXCLUDED.context, setup_done = true;
+  display_name = EXCLUDED.display_name, context = EXCLUDED.context, timezone = EXCLUDED.timezone,
+  preferences = COALESCE(user_profiles.preferences, '{{}}'::jsonb) || '{{"language": "{lang}"}}'::jsonb,
+  setup_done = true;
 
 INSERT INTO public.mcp_registry (server_name, path, mcp_url, description, tools, active)
 VALUES ('Wetter', 'wetter', '{mcp_url}/mcp/wetter', 'Weather via Open-Meteo', ARRAY['get_weather'], true)
