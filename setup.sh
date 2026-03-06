@@ -390,26 +390,51 @@ create_cred() {
   echo "$result"
 }
 
-TELEGRAM_CRED_ID=$(create_cred "Telegram Bot" "telegramApi" "{\"accessToken\":\"${TELEGRAM_BOT_TOKEN}\"}")
-[ -z "$TELEGRAM_CRED_ID" ] && echo -e "  ${YELLOW}⚠️  Telegram credential failed — will patch from existing${NC}" || echo "  ✅ Telegram Bot → ${TELEGRAM_CRED_ID}"
+# Check if credentials already exist before creating
+EXISTING_CREDS=$(curl -s "${N8N_BASE}/api/v1/credentials" -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+EXISTING_TELEGRAM_ID=$(echo "$EXISTING_CREDS" | python3 -c "
+import sys,json
+creds=json.load(sys.stdin).get('data',[])
+for c in creds:
+    if c.get('type')=='telegramApi': print(c['id']); break
+" 2>/dev/null)
+EXISTING_POSTGRES_ID=$(echo "$EXISTING_CREDS" | python3 -c "
+import sys,json
+creds=json.load(sys.stdin).get('data',[])
+for c in creds:
+    if c.get('type')=='postgres': print(c['id']); break
+" 2>/dev/null)
 
-# Postgres: try n8n CLI first, then REST
-cat > /tmp/pg-cred.json <<PGEOF
+if [ -n "$EXISTING_TELEGRAM_ID" ]; then
+  TELEGRAM_CRED_ID="$EXISTING_TELEGRAM_ID"
+  echo "  ✅ Telegram Bot → ${TELEGRAM_CRED_ID} (existing)"
+else
+  TELEGRAM_CRED_ID=$(create_cred "Telegram Bot" "telegramApi" "{\"accessToken\":\"${TELEGRAM_BOT_TOKEN}\"}")
+  [ -z "$TELEGRAM_CRED_ID" ] && echo -e "  ${YELLOW}⚠️  Telegram credential failed — will patch from existing${NC}" || echo "  ✅ Telegram Bot → ${TELEGRAM_CRED_ID} (created)"
+fi
+
+if [ -n "$EXISTING_POSTGRES_ID" ]; then
+  POSTGRES_CRED_ID="$EXISTING_POSTGRES_ID"
+  echo "  ✅ Supabase Postgres → ${POSTGRES_CRED_ID} (existing)"
+else
+  # Postgres: try n8n CLI first, then REST
+  cat > /tmp/pg-cred.json <<PGEOF
 {"name":"Supabase Postgres","type":"postgres","data":{"host":"db","database":"postgres","user":"postgres","password":"${POSTGRES_PASSWORD}","port":5432,"ssl":"disable","allowUnauthorizedCerts":true,"sshTunnel":false,"sshAuthenticateWith":"password"}}
 PGEOF
-POSTGRES_CRED_ID=$(docker compose run --rm -T n8n \
-  n8n import:credentials --input=/tmp/pg-cred.json 2>/dev/null | \
-  grep -oP '(?<=ID )\S+' | tail -1)
-[ -z "$POSTGRES_CRED_ID" ] && \
-  POSTGRES_CRED_ID=$(curl -s -X POST "${N8N_BASE}/api/v1/credentials" \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" -H "Content-Type: application/json" \
-    -d @/tmp/pg-cred.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
-if [ -z "$POSTGRES_CRED_ID" ]; then
-  echo -e "  ${YELLOW}⚠️  Postgres credential — add manually:${NC}"
-  echo "     Host: db | DB: postgres | User: postgres | Pass: ${POSTGRES_PASSWORD} | SSL: disable"
-  POSTGRES_CRED_ID="REPLACE_WITH_YOUR_CREDENTIAL_ID"
-else
-  echo "  ✅ Supabase Postgres → ${POSTGRES_CRED_ID}"
+  POSTGRES_CRED_ID=$(docker compose run --rm -T n8n \
+    n8n import:credentials --input=/tmp/pg-cred.json 2>/dev/null | \
+    grep -oP '(?<=ID )\S+' | tail -1)
+  [ -z "$POSTGRES_CRED_ID" ] && \
+    POSTGRES_CRED_ID=$(curl -s -X POST "${N8N_BASE}/api/v1/credentials" \
+      -H "X-N8N-API-KEY: ${N8N_API_KEY}" -H "Content-Type: application/json" \
+      -d @/tmp/pg-cred.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+  if [ -z "$POSTGRES_CRED_ID" ]; then
+    echo -e "  ${YELLOW}⚠️  Postgres credential — add manually:${NC}"
+    echo "     Host: db | DB: postgres | User: postgres | Pass: ${POSTGRES_PASSWORD} | SSL: disable"
+    POSTGRES_CRED_ID="REPLACE_WITH_YOUR_CREDENTIAL_ID"
+  else
+    echo "  ✅ Supabase Postgres → ${POSTGRES_CRED_ID} (created)"
+  fi
 fi
 fi  # end INSTALL_MODE guard for credentials
 
@@ -959,6 +984,18 @@ result = subprocess.run(['psql','-h','localhost','-U','postgres','-d','postgres'
 if result.returncode != 0:
     print('agents SQL error:', result.stderr[:200])
 PYEOF2
+
+# Write user profile to DB (so --force picks up existing values next time)
+LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -c "
+INSERT INTO public.user_profiles (user_id, display_name, timezone, context)
+VALUES ('telegram:${TELEGRAM_CHAT_ID}', '$(echo "$USER_DISPLAY" | sed "s/'/''/g")', '${TIMEZONE:-UTC}', '$(echo "$CTX" | sed "s/'/''/g")')
+ON CONFLICT (user_id) DO UPDATE SET
+  display_name = EXCLUDED.display_name,
+  timezone = EXCLUDED.timezone,
+  context = EXCLUDED.context,
+  updated_at = now();
+" > /dev/null 2>&1
+
 # Verify soul was written
 SOUL_COUNT=$(LANG=C LC_ALL=C PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -t -c "SELECT COUNT(*) FROM soul" 2>/dev/null | tr -d ' ')
 if [ "${SOUL_COUNT:-0}" -gt 0 ]; then
