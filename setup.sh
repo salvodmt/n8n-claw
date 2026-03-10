@@ -595,7 +595,7 @@ for f in workflows/*.json; do
   [ -n "$OPENAI_CRED_ID" ] && \
     sed -i "s|REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID\", \"name\": \"OpenAI API\"|${OPENAI_CRED_ID}\", \"name\": \"OpenAI API\"|g" "$out"
 done
-IMPORT_ORDER="mcp-client reminder-factory mcp-weather-example workflow-builder mcp-builder mcp-library-manager credential-form memory-consolidation heartbeat n8n-claw-agent"
+IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager credential-form memory-consolidation heartbeat n8n-claw-agent"
 
 # Fetch existing workflows once (for upsert: update if exists, create if not)
 EXISTING_WFS=$(curl -s "${N8N_BASE}/api/v1/workflows?limit=100" \
@@ -762,6 +762,14 @@ if [ -n "$CREDFORM_ID" ]; then
   curl -s -X POST "${N8N_BASE}/api/v1/workflows/${CREDFORM_ID}/activate" \
     -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
   echo -e "  ${GREEN}✅ Credential Form workflow activated${NC}"
+fi
+
+# Activate Reminder Runner (polls DB every minute for due reminders)
+REMINDER_RUNNER_ID=${WF_IDS['reminder-runner']}
+if [ -n "$REMINDER_RUNNER_ID" ]; then
+  curl -s -X POST "${N8N_BASE}/api/v1/workflows/${REMINDER_RUNNER_ID}/activate" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
+  echo -e "  ${GREEN}✅ Reminder Runner workflow activated${NC}"
 fi
 
 # Helper for interactive prompts (used by both update and fresh install)

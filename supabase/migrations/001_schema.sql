@@ -518,6 +518,35 @@ ALTER SEQUENCE public.tasks_id_seq OWNED BY public.tasks.id;
 
 
 --
+-- Name: reminders; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.reminders (
+    id integer NOT NULL,
+    user_id text NOT NULL,
+    chat_id text NOT NULL,
+    message text NOT NULL,
+    remind_at timestamp with time zone NOT NULL,
+    reminded_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE public.reminders OWNER TO postgres;
+
+CREATE SEQUENCE public.reminders_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER TABLE public.reminders_id_seq OWNER TO postgres;
+
+ALTER SEQUENCE public.reminders_id_seq OWNED BY public.reminders.id;
+
+
+--
 -- Name: agents id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -585,6 +614,13 @@ ALTER TABLE ONLY public.user_profiles ALTER COLUMN id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.tasks ALTER COLUMN id SET DEFAULT nextval('public.tasks_id_seq'::regclass);
+
+
+--
+-- Name: reminders id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reminders ALTER COLUMN id SET DEFAULT nextval('public.reminders_id_seq'::regclass);
 
 
 --
@@ -716,6 +752,14 @@ ALTER TABLE ONLY public.tasks
 
 
 --
+-- Name: reminders reminders_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reminders
+    ADD CONSTRAINT reminders_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: tasks tasks_parent_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -742,6 +786,13 @@ CREATE INDEX idx_tasks_due_date ON public.tasks USING btree (due_date) WHERE (du
 --
 
 CREATE INDEX idx_tasks_parent ON public.tasks USING btree (parent_id) WHERE (parent_id IS NOT NULL);
+
+
+--
+-- Name: idx_reminders_pending; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_reminders_pending ON public.reminders USING btree (remind_at) WHERE (reminded_at IS NULL);
 
 
 --
@@ -997,6 +1048,14 @@ GRANT ALL ON TABLE public.tasks TO service_role;
 GRANT ALL ON SEQUENCE public.tasks_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.tasks_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.tasks_id_seq TO service_role;
+
+GRANT ALL ON TABLE public.reminders TO anon;
+GRANT ALL ON TABLE public.reminders TO authenticated;
+GRANT ALL ON TABLE public.reminders TO service_role;
+
+GRANT ALL ON SEQUENCE public.reminders_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.reminders_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.reminders_id_seq TO service_role;
 
 
 --

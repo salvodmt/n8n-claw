@@ -1,0 +1,154 @@
+{
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "name": "⏰ Reminder Runner",
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Check Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Reminders": {
+      "main": [
+        [
+          {
+            "node": "Has Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Messages": {
+      "main": [
+        [
+          {
+            "node": "Mark Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "sched-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fetch all pending reminders that are due\nconst now = new Date().toISOString();\nconst reminders = await helpers.httpRequest({\n  method: 'GET',\n  url: `{{SUPABASE_URL}}/reminders?reminded_at=is.null&remind_at=lte.${now}&order=remind_at.asc`,\n  headers: {\n    'Authorization': 'Bearer {{SUPABASE_SERVICE_KEY}}',\n    'Content-Type': 'application/json'\n  },\n  json: true\n});\n\nif (!reminders || reminders.length === 0) {\n  return [];\n}\n\n// Return each reminder as a separate item for looping\nreturn reminders.map(r => ({ json: r }));"
+      },
+      "name": "Check Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "check-01"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-reminders",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Has Reminders",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "if-01"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=\u23f0 {{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Send Messages",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "send-01",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mark reminder as sent\nconst id = $('Has Reminders').item.json.id;\nawait helpers.httpRequest({\n  method: 'PATCH',\n  url: `{{SUPABASE_URL}}/reminders?id=eq.${id}`,\n  headers: {\n    'Authorization': 'Bearer {{SUPABASE_SERVICE_KEY}}',\n    'Content-Type': 'application/json'\n  },\n  body: { reminded_at: new Date().toISOString() },\n  json: true\n});\n\nreturn [{ json: { id, marked: true } }];"
+      },
+      "name": "Mark Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "mark-01"
+    }
+  ]
+}
