@@ -1074,8 +1074,9 @@ NEVER use WorkflowBuilder for MCP servers.
 Parameter: task (description of what the MCP server should do)
 NOTE: After build, manually deactivate + activate in n8n UI (webhook bug).
 
-## Available MCP Servers:
-- Wetter: {mcp_url}/mcp/wetter (tool: get_weather, param: city)
+## Available MCP Servers
+Loaded dynamically from the mcp_registry table at runtime.
+ALWAYS prefer MCP tools over generic HTTP/Web Search when a matching server exists.
 
 ## Registry
 Query all active servers: SELECT * FROM mcp_registry WHERE active = true;'),
