@@ -211,9 +211,9 @@ Want to create your own skills? See the [template contribution guide](https://gi
 > - Supabase Studio (`localhost:3001`, accessible via SSH tunnel) shows credentials in plain text
 > - A compromised VPS exposes all stored API keys
 >
-> PostgREST is **not exposed** to the internet — it runs on a Docker-internal network only. Direct database access (port 5432) is bound to `127.0.0.1`. The main risk is SSH/VPS compromise, not network exposure.
+> **What an attacker would need:** Neither the database nor the API are reachable from the internet. PostgREST runs on a Docker-internal network only, and PostgreSQL (port 5432) is bound to `127.0.0.1`. To read credentials, an attacker would need SSH access to your VPS — there is no remote network path.
 >
-> **Mitigation:** Secure SSH access (key-based, no root password), and use API keys with minimal permissions where possible.
+> **Mitigation:** Secure SSH access (key-based auth, no root password, fail2ban), and use API keys with minimal permissions where possible.
 >
 > Encryption at rest for skill credentials is planned and in progress.
 
