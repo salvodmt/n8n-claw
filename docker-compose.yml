@@ -146,6 +146,19 @@ services:
     networks:
       - n8n-claw-net
 
+  # ── Crawl4AI (Web Reader — clean markdown from URLs) ────────
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: n8n-claw-crawl4ai
+    restart: unless-stopped
+    shm_size: "2g"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    networks:
+      - n8n-claw-net
+
   # ── SearXNG (Web Search) ────────────────────────────────────
   searxng:
     image: searxng/searxng:latest
