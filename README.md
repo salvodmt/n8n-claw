@@ -414,6 +414,16 @@ SKIP_REVERSE_PROXY=true
 
 Your reverse proxy should forward traffic to `localhost:5678` (n8n) with WebSocket support enabled.
 
+> **⚠️ Known issue:** When you enter a domain and skip nginx, setup sets `N8N_URL=https://your-domain` in `.env`. It then tries to reach the n8n API via that HTTPS URL — but if your reverse proxy isn't forwarding traffic to n8n yet, the "Waiting for n8n API..." step will fail and the script exits.
+>
+> **Workaround:**
+> 1. Open `.env` and delete the `N8N_URL` line
+> 2. Re-run `./setup.sh` — it will use `http://localhost:5678` instead and complete successfully
+> 3. After setup is done, add `N8N_URL=https://your-domain` back to `.env`
+> 4. Restart n8n: `docker compose up -d`
+>
+> Make sure your reverse proxy forwards HTTPS traffic to `localhost:5678` before using the agent.
+
 > ⚠️ **Security note:** Without a domain, n8n runs over plain HTTP with no TLS and no rate limiting. This is fine for **local installs** (home server, LAN, testing). For a **public VPS**, always use a domain with HTTPS — otherwise credentials are transmitted unencrypted and the instance is exposed to the internet.
 
 ---
