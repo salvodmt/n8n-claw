@@ -32,7 +32,9 @@ n8n-claw/
 │   ├── reminder-runner.json        # Polls reminders table every minute, executes due reminders
 │   ├── memory-consolidation.json   # Nightly: summarizes daily log → long-term memory
 │   ├── project-manager.json        # Persistent project memory across sessions
-│   └── workflow-builder.json       # Builds general n8n automations (Claude Code CLI)
+│   ├── workflow-builder.json       # Builds general n8n automations (Claude Code CLI)
+│   ├── sub-agent-runner.json       # Runs expert sub-agents with dynamic personas
+│   └── agent-library-manager.json  # Install/remove expert agents from catalog
 │
 ├── supabase/
 │   ├── migrations/
@@ -94,7 +96,9 @@ Telegram Trigger
       ├── MCP Builder (toolWorkflow → MCP Builder)
       ├── MCP Client (toolCode)
       ├── Library Manager (toolWorkflow → MCP Library Manager)
-      └── Project Manager (toolWorkflow → Project Manager)
+      ├── Project Manager (toolWorkflow → Project Manager)
+      ├── Expert Agent (toolWorkflow → Sub-Agent Runner)
+      └── Agent Library (toolWorkflow → Agent Library Manager)
   → Save Conversation (postgres)
   → Save Daily Log (postgres)
   → Telegram Reply
@@ -155,6 +159,24 @@ The templates repo is cloned alongside this repo:
 
 Reminders use a **single polling workflow** (`reminder-runner.json`) that checks the `reminders` table every minute. The ReminderFactory tool just inserts a row — the Runner handles execution. This also supports scheduled actions where the agent executes instructions at a set time.
 
+### Expert Agents (Sub-Agent System)
+
+The agent can delegate specialized tasks to expert sub-agents. The main agent's personality stays unchanged — it delegates, receives the result, and rephrases it in its own tone.
+
+**Architecture:**
+- **Sub-Agent Runner** (`sub-agent-runner.json`) — ONE workflow for ALL personas. Receives `agent` (ID), `task`, `context`. Loads persona from `agents` table (`persona:{id}`), runs an independent AI Agent node with its own Claude LLM + tools (HTTP, Web Search, MCP Client).
+- **Agent Library Manager** (`agent-library-manager.json`) — Install/remove/list expert agents from the catalog. Fetches persona from CDN → INSERT into `agents` table. Updates `expert_agents` discovery entry.
+- **Agent Templates** (`n8n-claw-agents/`) — Subdirectory with agent persona definitions served via CDN (like `n8n-claw-templates`).
+
+**Database:** Personas stored in `agents` table with key format `persona:{agent-id}`. The `expert_agents` key in `agents` provides the discovery entry loaded into the system prompt.
+
+**Default agents** (shipped with setup.sh):
+- `research-expert` — Web research, fact-checking, source evaluation
+- `content-creator` — Text creation, social media, marketing copy
+- `data-analyst` — Data analysis, pattern recognition, reports
+
+**Placeholders:** `REPLACE_SUB_AGENT_RUNNER_ID`, `REPLACE_AGENT_LIBRARY_MANAGER_ID`
+
 ---
 
 ## dmo-claw — Tourism Fork
@@ -196,6 +218,8 @@ Hardcoded workflow IDs in the agent use `REPLACE_*` placeholders:
 - `REPLACE_MCP_BUILDER_ID`
 - `REPLACE_LIBRARY_MANAGER_ID`
 - `REPLACE_PROJECT_MANAGER_ID`
+- `REPLACE_SUB_AGENT_RUNNER_ID`
+- `REPLACE_AGENT_LIBRARY_MANAGER_ID`
 
 `setup.sh` patches these after import using the actual IDs returned by the n8n API.
 

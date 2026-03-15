@@ -490,6 +490,28 @@
           }
         ]
       ]
+    },
+    "Expert Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Library": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "nodes": [
@@ -1338,6 +1360,60 @@
       "typeVersion": 1.2,
       "position": [
         3856,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "name": "expert_agent",
+        "description": "Delegate a task to a specialized expert agent. The expert works independently with its own AI model and tools, then returns a structured result. You should rephrase the result in your own tone before replying to the user.\n\nParameters (JSON):\n- agent: Expert agent identifier (e.g. \"research-expert\", \"content-creator\", \"data-analyst\")\n- task: Detailed task description — be specific about what you need\n- context: Relevant conversation context the expert should know (optional)\n\nExamples:\n{\"agent\":\"research-expert\",\"task\":\"Recherchiere die besten Wanderwege in Tirol mit Schwierigkeitsgrad und Länge\",\"context\":\"User plant einen Wanderurlaub im Sommer\"}\n{\"agent\":\"content-creator\",\"task\":\"Erstelle einen Instagram-Post über unser neues Produkt\",\"context\":\"Produkt: AI-gestützter Kalender, Zielgruppe: junge Berufstätige\"}\n{\"agent\":\"data-analyst\",\"task\":\"Analysiere diese Verkaufszahlen und erstelle einen Report\",\"context\":\"Q1 2026: Jan 45k, Feb 52k, Mär 61k\"}",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_SUB_AGENT_RUNNER_ID",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "tool-expert-agent",
+      "name": "Expert Agent",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3984,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "name": "agent_library",
+        "description": "Manage the expert agent library. Install, list, or remove specialized expert agents from the catalog.\n\nActions:\n- list_agents: Show all available agents from the catalog (with installed status).\n- install_agent: Install an agent by ID. Downloads persona from catalog and saves to database.\n- remove_agent: Remove an installed agent by ID.\n- list_installed: Show only currently installed agents.\n\nInput: JSON with action and parameters.\nExamples:\n{\"action\":\"list_agents\"}\n{\"action\":\"install_agent\",\"id\":\"research-expert\"}\n{\"action\":\"remove_agent\",\"id\":\"research-expert\"}\n{\"action\":\"list_installed\"}",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_AGENT_LIBRARY_MANAGER_ID",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "tool-agent-library",
+      "name": "Agent Library",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4112,
         208
       ]
     }
