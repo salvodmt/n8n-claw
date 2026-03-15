@@ -404,7 +404,7 @@
             "index": 0
           },
           {
-            "node": "Telegram Reply",
+            "node": "Split Long Message",
             "type": "main",
             "index": 0
           }
@@ -412,6 +412,17 @@
       ],
       "ai_tool": [
         []
+      ]
+    },
+    "Split Long Message": {
+      "main": [
+        [
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Reminder": {
@@ -1083,12 +1094,25 @@
     {
       "parameters": {
         "chatId": "={{ $('Build System Prompt').first().json.chatId }}",
-        "text": "={{ $('AI Agent').first().json.output }}",
+        "text": "={{ $json.text }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "Markdown"
         }
       },
+      "id": "split-long-message",
+      "name": "Split Long Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3712,
+        -16
+      ],
+      "parameters": {
+        "jsCode": "const text = $('AI Agent').first().json.output || '';\nconst MAX = 4000; // Telegram limit is 4096, leave margin for formatting\n\nif (text.length <= MAX) {\n  return [{ json: { text } }];\n}\n\n// Split at paragraph boundaries\nconst chunks = [];\nlet remaining = text;\n\nwhile (remaining.length > MAX) {\n  let cutPoint = remaining.lastIndexOf('\\n\\n', MAX);\n  if (cutPoint < MAX * 0.3) {\n    // No good paragraph break — try single newline\n    cutPoint = remaining.lastIndexOf('\\n', MAX);\n  }\n  if (cutPoint < MAX * 0.3) {\n    // No good break at all — cut at space\n    cutPoint = remaining.lastIndexOf(' ', MAX);\n  }\n  if (cutPoint < MAX * 0.3) {\n    // Absolute fallback — hard cut\n    cutPoint = MAX;\n  }\n  chunks.push(remaining.substring(0, cutPoint).trim());\n  remaining = remaining.substring(cutPoint).trim();\n}\nif (remaining) chunks.push(remaining);\n\nreturn chunks.map(c => ({ json: { text: c } }));"
+      }
+    },
+    {
       "id": "telegram-reply",
       "name": "Telegram Reply",
       "type": "n8n-nodes-base.telegram",
