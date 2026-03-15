@@ -202,16 +202,13 @@
     {
       "id": "sub-http-tool",
       "name": "HTTP Request Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
-      "typeVersion": 1.1,
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
       "position": [960, 240],
       "parameters": {
-        "method": "={{$fromAI('method', 'HTTP method', 'string')}}",
-        "url": "={{$fromAI('url', 'Full URL to request', 'string')}}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{$fromAI('body', 'JSON request body (empty object {} if none)', 'string')}}",
-        "options": {}
+        "description": "Make HTTP requests to any URL. Input: a JSON object with 'url' (required), 'method' (GET/POST/PUT/DELETE, default GET), 'headers' (object, optional), 'body' (string or object, optional).",
+        "jsCode": "const qType = typeof query;\nlet url = '', method = 'GET', headers = {}, body = null;\n\nif (qType === 'object' && query !== null) {\n  url = query.url || '';\n  method = (query.method || 'GET').toUpperCase();\n  headers = query.headers || {};\n  body = query.body || null;\n} else if (qType === 'string') {\n  try {\n    const parsed = JSON.parse(query);\n    url = parsed.url || '';\n    method = (parsed.method || 'GET').toUpperCase();\n    headers = parsed.headers || {};\n    body = parsed.body || null;\n  } catch(e) {\n    url = query;\n  }\n}\n\nif (!url) return 'Error: no URL provided';\n\ntry {\n  const opts = { method, url, headers };\n  if (body && method !== 'GET') {\n    opts.body = typeof body === 'string' ? body : JSON.stringify(body);\n    if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';\n  }\n  const resp = await helpers.httpRequest(opts);\n  const result = typeof resp === 'string' ? resp : JSON.stringify(resp);\n  return result.length > 10000 ? result.substring(0, 10000) + '... (truncated)' : result;\n} catch(e) {\n  return 'HTTP Error: ' + e.message;\n}",
+        "specifyInputSchema": false
       }
     },
     {
