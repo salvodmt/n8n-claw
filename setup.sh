@@ -585,6 +585,7 @@ for f in workflows/*.json; do
     -e "s|{{SUPABASE_SERVICE_KEY}}|${SUPABASE_SERVICE_KEY}|g" \
     -e "s|{{SUPABASE_ANON_KEY}}|${SUPABASE_ANON_KEY}|g" \
     -e "s|{{TELEGRAM_CHAT_ID}}|${TELEGRAM_CHAT_ID}|g" \
+    -e "s|{{TELEGRAM_BOT_TOKEN}}|${TELEGRAM_BOT_TOKEN}|g" \
     -e "s|{{CREDENTIAL_FORM_WEBHOOK_ID}}|${CREDENTIAL_FORM_WEBHOOK_ID}|g" \
     "$out"
   # Credential ID replacements — only if IDs are actually set
@@ -595,7 +596,7 @@ for f in workflows/*.json; do
   [ -n "$OPENAI_CRED_ID" ] && \
     sed -i "s|REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID\", \"name\": \"OpenAI API\"|${OPENAI_CRED_ID}\", \"name\": \"OpenAI API\"|g" "$out"
 done
-IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager agent-library-manager sub-agent-runner credential-form memory-consolidation heartbeat n8n-claw-agent"
+IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager agent-library-manager sub-agent-runner credential-form memory-consolidation background-checker heartbeat n8n-claw-agent"
 
 # n8n Public API settings whitelist — the PUT endpoint rejects any settings
 # field not in its OpenAPI schema (additionalProperties: false), even though
@@ -771,6 +772,7 @@ import sys, json
 ALLOWED = set('${N8N_SETTINGS_WHITELIST}'.split(','))
 raw = sys.stdin.read()
 raw = raw.replace('REPLACE_AGENT_WORKFLOW_ID', '${AGENT_WF_ID_FOR_HB}')
+raw = raw.replace('REPLACE_BACKGROUND_CHECKER_ID', '${WF_IDS[background-checker]}')
 wf = json.loads(raw)
 nodes = wf.get('nodes') or wf.get('activeVersion',{}).get('nodes',[])
 conns = wf.get('connections') or wf.get('activeVersion',{}).get('connections',{})
@@ -840,7 +842,7 @@ if [ -n "$REMINDER_RUNNER_ID" ]; then
 fi
 
 # Activate sub-workflows (required since n8n 2.x)
-for SUB_WF in mcp-client mcp-builder mcp-library-manager agent-library-manager sub-agent-runner workflow-builder reminder-factory project-manager; do
+for SUB_WF in mcp-client mcp-builder mcp-library-manager agent-library-manager sub-agent-runner workflow-builder reminder-factory project-manager background-checker; do
   SUB_WF_ID=${WF_IDS[$SUB_WF]}
   if [ -n "$SUB_WF_ID" ]; then
     curl -s -X POST "${N8N_BASE}/api/v1/workflows/${SUB_WF_ID}/activate" \

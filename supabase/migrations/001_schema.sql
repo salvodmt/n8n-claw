@@ -1141,6 +1141,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_actions (
     next_run timestamp with time zone,
     run_count integer DEFAULT 0,
     max_runs integer,
+    notify_mode text NOT NULL DEFAULT 'always',
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()

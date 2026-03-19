@@ -42,7 +42,47 @@
         [],
         [
           {
+            "node": "Route by Notify Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Notify Mode": {
+      "main": [
+        [
+          {
+            "node": "Execute Background Checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Execute Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Background Checker": {
+      "main": [
+        [
+          {
+            "node": "Handle Checker Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Checker Response": {
+      "main": [
+        [
+          {
+            "node": "Update Action",
             "type": "main",
             "index": 0
           }
@@ -93,7 +133,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Load due scheduled actions + proactive reminder check\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst CHAT_ID = '{{TELEGRAM_CHAT_ID}}';\nconst http = this.helpers.httpRequest;\n\nasync function pgrest(path) {\n  const res = await http({\n    method: 'GET',\n    url: `${SUPABASE_URL}${path}`,\n    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n  return typeof res.body === 'string' ? JSON.parse(res.body) : res.body;\n}\n\nconst userId = `telegram:${CHAT_ID}`;\nconst now = new Date();\nconst nowISO = now.toISOString();\n\n// Load all context in parallel\nconst [dueActions, tasks, profiles, heartbeatCfg] = await Promise.all([\n  pgrest(`/rest/v1/scheduled_actions?enabled=eq.true&next_run=lte.${nowISO}&order=next_run.asc`),\n  pgrest(`/rest/v1/tasks?user_id=eq.${encodeURIComponent(userId)}&status=in.(pending,in_progress)&order=due_date.asc.nullslast,priority.desc`),\n  pgrest(`/rest/v1/user_profiles?user_id=eq.${encodeURIComponent(userId)}&select=display_name,timezone,preferences`),\n  pgrest('/rest/v1/heartbeat_config?check_name=eq.heartbeat&select=config,last_run,enabled')\n]);\n\nconst profile = (Array.isArray(profiles) && profiles.length > 0) ? profiles[0] : {};\nconst prefs = profile.preferences || {};\nconst tz = profile.timezone || 'Europe/Berlin';\nconst lang = prefs.language || 'English';\n\n// Build result items from due scheduled actions\nconst items = [];\n\nif (Array.isArray(dueActions)) {\n  for (const action of dueActions) {\n    items.push({\n      json: {\n        type: 'scheduled_action',\n        actionId: action.id,\n        message: action.instruction,\n        chat_id: action.chat_id,\n        user_id: action.user_id,\n        source: 'scheduled_action',\n        schedule: action.schedule,\n        timezone: action.timezone || tz,\n        run_count: action.run_count || 0,\n        max_runs: action.max_runs,\n        name: action.name\n      }\n    });\n  }\n}\n\n// Proactive reminder check (existing logic — kept as synthetic item)\nconst hbEnabled = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0) ? heartbeatCfg[0].enabled : false;\nconst hbLastRun = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0 && heartbeatCfg[0].last_run) ? new Date(heartbeatCfg[0].last_run) : null;\nconst hbMinInterval = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0 && heartbeatCfg[0].config) ? (heartbeatCfg[0].config.min_interval_hours || 2) : 2;\n\nif (hbEnabled) {\n  const hoursSinceLastRun = hbLastRun ? (now.getTime() - hbLastRun.getTime()) / (1000 * 60 * 60) : 999;\n  if (hoursSinceLastRun >= hbMinInterval) {\n    const taskList = Array.isArray(tasks) ? tasks : [];\n    const overdue = taskList.filter(t => t.due_date && new Date(t.due_date) < now);\n    const urgent = taskList.filter(t => t.priority === 'urgent');\n\n    if (overdue.length > 0 || urgent.length > 0) {\n      // Build a natural-language instruction for the agent\n      let instruction = `You are proactively checking in with the user. Respond in ${lang}. Send a brief, helpful reminder (1-3 sentences) about these items:\\n`;\n      if (overdue.length > 0) {\n        instruction += `\\nOverdue tasks:\\n${overdue.map(t => `- ${t.title} (due: ${t.due_date}, priority: ${t.priority})`).join('\\n')}`;\n      }\n      if (urgent.length > 0) {\n        instruction += `\\nUrgent tasks:\\n${urgent.map(t => `- ${t.title}`).join('\\n')}`;\n      }\n      instruction += `\\n\\nBe helpful, not annoying. If nothing seems worth messaging about, just skip this.`;\n\n      items.push({\n        json: {\n          type: 'proactive_reminder',\n          actionId: null,\n          message: instruction,\n          chat_id: CHAT_ID,\n          user_id: userId,\n          source: 'scheduled_action'\n        }\n      });\n    }\n  }\n}\n\nif (items.length === 0) {\n  return [{ json: {} }];\n}\n\nreturn items;"
+        "jsCode": "// Load due scheduled actions + proactive reminder check\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst CHAT_ID = '{{TELEGRAM_CHAT_ID}}';\nconst http = this.helpers.httpRequest;\n\nasync function pgrest(path) {\n  const res = await http({\n    method: 'GET',\n    url: `${SUPABASE_URL}${path}`,\n    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n  return typeof res.body === 'string' ? JSON.parse(res.body) : res.body;\n}\n\nconst userId = `telegram:${CHAT_ID}`;\nconst now = new Date();\nconst nowISO = now.toISOString();\n\n// Load all context in parallel\nconst [dueActions, tasks, profiles, heartbeatCfg, mcpServers] = await Promise.all([\n  pgrest(`/rest/v1/scheduled_actions?enabled=eq.true&next_run=lte.${nowISO}&order=next_run.asc`),\n  pgrest(`/rest/v1/tasks?user_id=eq.${encodeURIComponent(userId)}&status=in.(pending,in_progress)&order=due_date.asc.nullslast,priority.desc`),\n  pgrest(`/rest/v1/user_profiles?user_id=eq.${encodeURIComponent(userId)}&select=display_name,timezone,preferences`),\n  pgrest('/rest/v1/heartbeat_config?check_name=eq.heartbeat&select=config,last_run,enabled'),\n  pgrest('/rest/v1/mcp_registry?active=eq.true&select=server_name,mcp_url,description,tools')\n]);\n\nconst profile = (Array.isArray(profiles) && profiles.length > 0) ? profiles[0] : {};\nconst prefs = profile.preferences || {};\nconst tz = profile.timezone || 'Europe/Berlin';\nconst lang = prefs.language || 'German';\n\n// Build MCP skills text for background checker\nlet mcpSkillsText = '';\nif (Array.isArray(mcpServers) && mcpServers.length > 0) {\n  mcpSkillsText = mcpServers.map(s => {\n    const tools = Array.isArray(s.tools) ? s.tools.join(', ') : '';\n    return `- ${s.server_name}: ${s.mcp_url} (tools: ${tools}) — ${s.description || ''}`;\n  }).join('\\n');\n}\n\n// Build result items from due scheduled actions\nconst items = [];\n\nif (Array.isArray(dueActions)) {\n  for (const action of dueActions) {\n    items.push({\n      json: {\n        type: 'scheduled_action',\n        actionId: action.id,\n        message: action.instruction,\n        chat_id: action.chat_id,\n        user_id: action.user_id,\n        source: 'scheduled_action',\n        schedule: action.schedule,\n        timezone: action.timezone || tz,\n        run_count: action.run_count || 0,\n        max_runs: action.max_runs,\n        name: action.name,\n        notify_mode: action.notify_mode || 'always',\n        mcp_skills: mcpSkillsText,\n        language: lang\n      }\n    });\n  }\n}\n\n// Proactive reminder check (existing logic — kept as synthetic item)\nconst hbEnabled = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0) ? heartbeatCfg[0].enabled : false;\nconst hbLastRun = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0 && heartbeatCfg[0].last_run) ? new Date(heartbeatCfg[0].last_run) : null;\nconst hbMinInterval = (Array.isArray(heartbeatCfg) && heartbeatCfg.length > 0 && heartbeatCfg[0].config) ? (heartbeatCfg[0].config.min_interval_hours || 2) : 2;\n\nif (hbEnabled) {\n  const hoursSinceLastRun = hbLastRun ? (now.getTime() - hbLastRun.getTime()) / (1000 * 60 * 60) : 999;\n  if (hoursSinceLastRun >= hbMinInterval) {\n    const taskList = Array.isArray(tasks) ? tasks : [];\n    const overdue = taskList.filter(t => t.due_date && new Date(t.due_date) < now);\n    const urgent = taskList.filter(t => t.priority === 'urgent');\n\n    if (overdue.length > 0 || urgent.length > 0) {\n      let instruction = `You are proactively checking in with the user. Respond in ${lang}. Send a brief, helpful reminder (1-3 sentences) about these items:\\n`;\n      if (overdue.length > 0) {\n        instruction += `\\nOverdue tasks:\\n${overdue.map(t => `- ${t.title} (due: ${t.due_date}, priority: ${t.priority})`).join('\\n')}`;\n      }\n      if (urgent.length > 0) {\n        instruction += `\\nUrgent tasks:\\n${urgent.map(t => `- ${t.title}`).join('\\n')}`;\n      }\n      instruction += `\\n\\nBe helpful, not annoying. If nothing seems worth messaging about, just skip this.`;\n\n      items.push({\n        json: {\n          type: 'proactive_reminder',\n          actionId: null,\n          message: instruction,\n          chat_id: CHAT_ID,\n          user_id: userId,\n          source: 'scheduled_action',\n          notify_mode: 'always'\n        }\n      });\n    }\n  }\n}\n\nif (items.length === 0) {\n  return [{ json: { type: 'no_action' } }];\n}\n\nreturn items;"
       },
       "id": "load-due-actions",
       "name": "Load Due Actions",
@@ -113,10 +153,10 @@
             {
               "id": "has-actions",
               "leftValue": "={{ $json.type }}",
-              "rightValue": "",
+              "rightValue": "no_action",
               "operator": {
                 "type": "string",
-                "operation": "exists"
+                "operation": "notEquals"
               }
             }
           ],
@@ -142,6 +182,71 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-on-change",
+              "leftValue": "={{ $json.notify_mode }}",
+              "rightValue": "on_change",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "route-notify-mode",
+      "name": "Route by Notify Mode",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_BACKGROUND_CHECKER_ID",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "inputData": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "instruction": "={{ $json.message }}",
+            "chat_id": "={{ $json.chat_id }}",
+            "mcp_skills": "={{ $json.mcp_skills }}",
+            "language": "={{ $json.language }}"
+          }
+        }
+      },
+      "id": "exec-bg-checker",
+      "name": "Execute Background Checker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1100, -120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Handle Background Checker response: send Telegram only if notify=true\nconst BOT_TOKEN = '{{TELEGRAM_BOT_TOKEN}}';\nconst http = this.helpers.httpRequest;\n\nconst checkerResult = $input.first().json;\nconst loopItem = $('Route by Notify Mode').first().json;\nconst chatId = loopItem.chat_id || '{{TELEGRAM_CHAT_ID}}';\n\nif (checkerResult.notify && checkerResult.message) {\n  // Send Telegram message\n  const text = checkerResult.message;\n  try {\n    await http({\n      method: 'POST',\n      url: `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({\n        chat_id: chatId,\n        text: text,\n        parse_mode: 'Markdown'\n      })\n    });\n  } catch(e) {\n    // Retry without Markdown if formatting fails\n    await http({\n      method: 'POST',\n      url: `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ chat_id: chatId, text: text })\n    });\n  }\n}\n\n// Pass through original action data for Update Action\nreturn [{ json: loopItem }];"
+      },
+      "id": "handle-checker-response",
+      "name": "Handle Checker Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -120]
+    },
+    {
+      "parameters": {
         "workflowId": {
           "__rl": true,
           "value": "REPLACE_AGENT_WORKFLOW_ID",
@@ -164,18 +269,18 @@
       "name": "Execute Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [880, 0]
+      "position": [1100, 120]
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Update scheduled action: last_run, run_count, next_run\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst http = this.helpers.httpRequest;\n\nconst item = $input.first().json;\nconst now = new Date();\n\n// Proactive reminder: update heartbeat_config instead\nif (item.type === 'proactive_reminder') {\n  await http({\n    method: 'PATCH',\n    url: `${SUPABASE_URL}/rest/v1/heartbeat_config?check_name=eq.heartbeat`,\n    headers: {\n      'apikey': SUPABASE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=minimal'\n    },\n    body: { last_run: now.toISOString() }\n  });\n  return [{ json: { status: 'updated', type: 'proactive_reminder' } }];\n}\n\n// Scheduled action: compute next_run and update\nconst actionId = item.actionId;\nconst schedule = item.schedule;\nconst tz = item.timezone || 'Europe/Berlin';\nconst runCount = (item.run_count || 0) + 1;\nconst maxRuns = item.max_runs;\n\nfunction computeNextRun(schedule, tz) {\n  const now = new Date();\n\n  if (schedule.type === 'interval') {\n    // Subtract 30s buffer so the next heartbeat cycle reliably finds this action due\n    return new Date(now.getTime() + (schedule.minutes || 60) * 60000 - 30000).toISOString();\n  }\n\n  if (schedule.type === 'daily') {\n    const [h, m] = (schedule.time || '08:00').split(':').map(Number);\n    // Get current date in the action's timezone\n    const userNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));\n    // Build target time today\n    const target = new Date(userNow);\n    target.setHours(h, m, 0, 0);\n    // If already past today, move to tomorrow\n    if (target <= userNow) {\n      target.setDate(target.getDate() + 1);\n    }\n    // Convert back: compute offset from userNow to target, add to real now\n    const diffMs = target.getTime() - userNow.getTime();\n    return new Date(now.getTime() + diffMs).toISOString();\n  }\n\n  if (schedule.type === 'weekly') {\n    const [h, m] = (schedule.time || '09:00').split(':').map(Number);\n    const days = schedule.days || [1]; // 1=Mon .. 7=Sun\n    const userNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));\n    // JS getDay(): 0=Sun, convert to 1=Mon..7=Sun\n    const jsDay = userNow.getDay();\n    const currentDay = jsDay === 0 ? 7 : jsDay;\n    const currentMinutes = userNow.getHours() * 60 + userNow.getMinutes();\n    const targetMinutes = h * 60 + m;\n\n    // Find next matching day\n    let minDaysAhead = 8;\n    for (const d of days) {\n      let ahead = d - currentDay;\n      if (ahead < 0) ahead += 7;\n      if (ahead === 0 && currentMinutes >= targetMinutes) ahead = 7;\n      if (ahead < minDaysAhead) minDaysAhead = ahead;\n    }\n\n    const target = new Date(userNow);\n    target.setDate(target.getDate() + minDaysAhead);\n    target.setHours(h, m, 0, 0);\n    const diffMs = target.getTime() - userNow.getTime();\n    return new Date(now.getTime() + diffMs).toISOString();\n  }\n\n  // Fallback: 1 hour\n  return new Date(now.getTime() + 3600000).toISOString();\n}\n\nconst nextRun = computeNextRun(schedule, tz);\nconst shouldDisable = maxRuns !== null && maxRuns !== undefined && runCount >= maxRuns;\n\nawait http({\n  method: 'PATCH',\n  url: `${SUPABASE_URL}/rest/v1/scheduled_actions?id=eq.${actionId}`,\n  headers: {\n    'apikey': SUPABASE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    last_run: now.toISOString(),\n    run_count: runCount,\n    next_run: shouldDisable ? null : nextRun,\n    enabled: !shouldDisable,\n    updated_at: now.toISOString()\n  }\n});\n\nreturn [{ json: { status: 'updated', actionId, runCount, nextRun: shouldDisable ? null : nextRun, disabled: shouldDisable } }];"
+        "jsCode": "// Update scheduled action: last_run, run_count, next_run\nconst SUPABASE_URL = '{{SUPABASE_URL}}';\nconst SUPABASE_KEY = '{{SUPABASE_SERVICE_KEY}}';\nconst http = this.helpers.httpRequest;\n\n// Get the action data — may come from Handle Checker Response or Execute Agent\nconst item = $input.first().json;\nconst now = new Date();\n\n// Proactive reminder: update heartbeat_config instead\nif (item.type === 'proactive_reminder') {\n  await http({\n    method: 'PATCH',\n    url: `${SUPABASE_URL}/rest/v1/heartbeat_config?check_name=eq.heartbeat`,\n    headers: {\n      'apikey': SUPABASE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=minimal'\n    },\n    body: { last_run: now.toISOString() }\n  });\n  return [{ json: { status: 'updated', type: 'proactive_reminder' } }];\n}\n\n// Scheduled action: compute next_run and update\nconst actionId = item.actionId;\nconst schedule = item.schedule;\nconst tz = item.timezone || 'Europe/Berlin';\nconst runCount = (item.run_count || 0) + 1;\nconst maxRuns = item.max_runs;\n\nfunction computeNextRun(schedule, tz) {\n  const now = new Date();\n\n  if (schedule.type === 'interval') {\n    // Subtract 30s buffer so the next heartbeat cycle reliably finds this action due\n    return new Date(now.getTime() + (schedule.minutes || 60) * 60000 - 30000).toISOString();\n  }\n\n  if (schedule.type === 'daily') {\n    const [h, m] = (schedule.time || '08:00').split(':').map(Number);\n    const userNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));\n    const target = new Date(userNow);\n    target.setHours(h, m, 0, 0);\n    if (target <= userNow) {\n      target.setDate(target.getDate() + 1);\n    }\n    const diffMs = target.getTime() - userNow.getTime();\n    return new Date(now.getTime() + diffMs).toISOString();\n  }\n\n  if (schedule.type === 'weekly') {\n    const [h, m] = (schedule.time || '09:00').split(':').map(Number);\n    const days = schedule.days || [1];\n    const userNow = new Date(now.toLocaleString('en-US', { timeZone: tz }));\n    const jsDay = userNow.getDay();\n    const currentDay = jsDay === 0 ? 7 : jsDay;\n    const currentMinutes = userNow.getHours() * 60 + userNow.getMinutes();\n    const targetMinutes = h * 60 + m;\n\n    let minDaysAhead = 8;\n    for (const d of days) {\n      let ahead = d - currentDay;\n      if (ahead < 0) ahead += 7;\n      if (ahead === 0 && currentMinutes >= targetMinutes) ahead = 7;\n      if (ahead < minDaysAhead) minDaysAhead = ahead;\n    }\n\n    const target = new Date(userNow);\n    target.setDate(target.getDate() + minDaysAhead);\n    target.setHours(h, m, 0, 0);\n    const diffMs = target.getTime() - userNow.getTime();\n    return new Date(now.getTime() + diffMs).toISOString();\n  }\n\n  return new Date(now.getTime() + 3600000).toISOString();\n}\n\nconst nextRun = computeNextRun(schedule, tz);\nconst shouldDisable = maxRuns !== null && maxRuns !== undefined && runCount >= maxRuns;\n\nawait http({\n  method: 'PATCH',\n  url: `${SUPABASE_URL}/rest/v1/scheduled_actions?id=eq.${actionId}`,\n  headers: {\n    'apikey': SUPABASE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    last_run: now.toISOString(),\n    run_count: runCount,\n    next_run: shouldDisable ? null : nextRun,\n    enabled: !shouldDisable,\n    updated_at: now.toISOString()\n  }\n});\n\nreturn [{ json: { status: 'updated', actionId, runCount, nextRun: shouldDisable ? null : nextRun, disabled: shouldDisable } }];"
       },
       "id": "update-action",
       "name": "Update Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 0]
+      "position": [1540, 0]
     }
   ]
 }
