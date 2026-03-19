@@ -465,6 +465,9 @@ for c in creds:
 if [ -n "$EXISTING_ANTHROPIC_ID" ]; then
   ANTHROPIC_CRED_ID="$EXISTING_ANTHROPIC_ID"
   echo "  ✅ Anthropic API → ${ANTHROPIC_CRED_ID} (existing)"
+elif [ -n "$ANTHROPIC_API_KEY" ] && [[ "$ANTHROPIC_API_KEY" != "your_"* ]]; then
+  ANTHROPIC_CRED_ID=$(create_cred "Anthropic API" "anthropicApi" "{\"apiKey\":\"${ANTHROPIC_API_KEY}\"}")
+  [ -z "$ANTHROPIC_CRED_ID" ] && echo -e "  ${YELLOW}⚠️  Anthropic credential failed — add manually in n8n UI${NC}" || echo "  ✅ Anthropic API → ${ANTHROPIC_CRED_ID} (created)"
 fi
 
 if [ -n "$EXISTING_TELEGRAM_ID" ]; then
@@ -635,8 +638,27 @@ for wf in data.get('data', []):
 " "$wf_name" 2>/dev/null)
 
   if [ -n "$existing_id" ]; then
-    # UPDATE existing workflow (PUT) — preserves workflow ID, no duplicates
-    UPDATE_BODY=$(python3 -c "
+    if [ "$FORCE_FLAG" = "--force" ]; then
+      # FORCE: delete + re-create so n8n builds fresh credential-workflow
+      # associations. PUT preserves existing associations but cannot create
+      # new ones — so workflows that were first imported with invalid
+      # credential IDs (placeholders) would never get credentials via PUT.
+      curl -s -X DELETE "${N8N_BASE}/api/v1/workflows/${existing_id}" \
+        -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null
+      resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
+        -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+        -H "Content-Type: application/json" -d @"$f")
+      wf_id=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
+      if [ -z "$wf_id" ]; then
+        err=$(echo "$resp" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null)
+        echo -e "  ${RED}❌ ${wf_name}: ${err}${NC}"
+      else
+        WF_IDS[$name]=$wf_id
+        echo "  ✅ ${wf_name} → ${wf_id} (re-created)"
+      fi
+    else
+      # Normal update: PUT — preserves workflow ID and existing credential associations
+      UPDATE_BODY=$(python3 -c "
 import json, sys
 ALLOWED = set('${N8N_SETTINGS_WHITELIST}'.split(','))
 wf = json.load(open(sys.argv[1]))
@@ -648,11 +670,12 @@ print(json.dumps({
     'settings': settings
 }))
 " "$f" 2>/dev/null)
-    resp=$(curl -s -X PUT "${N8N_BASE}/api/v1/workflows/${existing_id}" \
-      -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-      -H "Content-Type: application/json" -d "$UPDATE_BODY")
-    WF_IDS[$name]="$existing_id"
-    echo "  ✅ ${wf_name} → ${existing_id} (updated)"
+      resp=$(curl -s -X PUT "${N8N_BASE}/api/v1/workflows/${existing_id}" \
+        -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+        -H "Content-Type: application/json" -d "$UPDATE_BODY")
+      WF_IDS[$name]="$existing_id"
+      echo "  ✅ ${wf_name} → ${existing_id} (updated)"
+    fi
   else
     # CREATE new workflow (POST)
     resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
