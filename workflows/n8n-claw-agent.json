@@ -390,6 +390,28 @@
         ]
       ]
     },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Webhook Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Webhook Input": {
+      "main": [
+        [
+          {
+            "node": "Merge Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Prepare Save": {
       "main": [
         [
@@ -404,7 +426,7 @@
             "index": 0
           },
           {
-            "node": "Split Long Message",
+            "node": "Response Router",
             "type": "main",
             "index": 0
           }
@@ -412,6 +434,24 @@
       ],
       "ai_tool": [
         []
+      ]
+    },
+    "Response Router": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Long Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Split Long Message": {
@@ -809,7 +849,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $('Telegram Trigger').first().json.message;\nconst chatId = String(msg.chat.id);\nconst userId = String(msg.from.id);\nconst source = 'telegram';\n\nfunction out(userMessage) {\n  return [{ json: { userMessage, chatId, userId, source } }];\n}\n\n// Determine which media path we came from\nlet userMessage = '';\n\n// Check voice transcription result\ntry {\n  const transcript = $('Transcribe Voice').first()?.json?.text;\n  if (transcript) {\n    return out('[Voice message] ' + transcript);\n  }\n} catch(e) {}\n\n// Check photo (analyzed by OpenAI Vision)\ntry {\n  const analysis = $('Analyze Photo').first();\n  if (analysis) {\n    let description = '';\n    const j = analysis.json;\n    if (Array.isArray(j)) {\n      description = j[0]?.content?.[0]?.text || JSON.stringify(j);\n    } else {\n      description = j.text || j.content || JSON.stringify(j);\n    }\n    const caption = msg.caption || '';\n    userMessage = '[Photo analysis]\\n' + description + (caption ? '\\n\\nUser caption: ' + caption : '');\n    return out(userMessage);\n  }\n} catch(e) {}\n\n// Check document (PDF text extracted by Extract PDF Text node)\ntry {\n  const extracted = $('Extract PDF Text').first();\n  if (extracted) {\n    const filename = msg.document?.file_name || 'unknown';\n    const pdfText = extracted.json.text || '';\n    userMessage = '[Document: ' + filename + ']\\n\\n' + pdfText + '\\n\\n' + (msg.caption || 'Please analyze this document.');\n    return out(userMessage);\n  }\n} catch(e) {}\n\n// Check location\ntry {\n  const locMsg = $('Format Location').first()?.json?.userMessage;\n  if (locMsg) {\n    return out(locMsg);\n  }\n} catch(e) {}\n\n// Check unsupported\ntry {\n  const unsup = $('Unsupported Media').first()?.json?.userMessage;\n  if (unsup) {\n    return out(unsup);\n  }\n} catch(e) {}\n\n// Default: text message\nuserMessage = msg.text || '';\nreturn out(userMessage);"
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message;\nconst chatId = String(msg.chat.id);\nconst userId = String(msg.from.id);\nconst source = 'telegram';\nconst sessionId = 'telegram:' + chatId;\nconst qualifiedUserId = 'telegram:' + userId;\n\nfunction out(userMessage) {\n  return [{ json: { userMessage, chatId, userId, sessionId, qualifiedUserId, source } }];\n}\n\n// Determine which media path we came from\nlet userMessage = '';\n\n// Check voice transcription result\ntry {\n  const transcript = $('Transcribe Voice').first()?.json?.text;\n  if (transcript) {\n    return out('[Voice message] ' + transcript);\n  }\n} catch(e) {}\n\n// Check photo (analyzed by OpenAI Vision)\ntry {\n  const analysis = $('Analyze Photo').first();\n  if (analysis) {\n    let description = '';\n    const j = analysis.json;\n    if (Array.isArray(j)) {\n      description = j[0]?.content?.[0]?.text || JSON.stringify(j);\n    } else {\n      description = j.text || j.content || JSON.stringify(j);\n    }\n    const caption = msg.caption || '';\n    userMessage = '[Photo analysis]\\n' + description + (caption ? '\\n\\nUser caption: ' + caption : '');\n    return out(userMessage);\n  }\n} catch(e) {}\n\n// Check document (PDF text extracted by Extract PDF Text node)\ntry {\n  const extracted = $('Extract PDF Text').first();\n  if (extracted) {\n    const filename = msg.document?.file_name || 'unknown';\n    const pdfText = extracted.json.text || '';\n    userMessage = '[Document: ' + filename + ']\\n\\n' + pdfText + '\\n\\n' + (msg.caption || 'Please analyze this document.');\n    return out(userMessage);\n  }\n} catch(e) {}\n\n// Check location\ntry {\n  const locMsg = $('Format Location').first()?.json?.userMessage;\n  if (locMsg) {\n    return out(locMsg);\n  }\n} catch(e) {}\n\n// Check unsupported\ntry {\n  const unsup = $('Unsupported Media').first()?.json?.userMessage;\n  if (unsup) {\n    return out(unsup);\n  }\n} catch(e) {}\n\n// Default: text message\nuserMessage = msg.text || '';\nreturn out(userMessage);"
       },
       "id": "normalize-message",
       "name": "Normalize Message",
@@ -835,7 +875,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst message = raw.message || '';\nconst chatId = String(raw.chat_id || '');\n// Strip 'telegram:' prefix if present to get raw numeric ID\nconst userId = String(raw.user_id || '').replace('telegram:', '');\nconst source = raw.source || 'scheduled_task';\n\nreturn [{ json: { userMessage: message, chatId, userId, source } }];"
+        "jsCode": "const raw = $input.first().json;\nconst message = raw.message || '';\nconst chatId = String(raw.chat_id || '');\n// Strip 'telegram:' prefix if present to get raw numeric ID\nconst userId = String(raw.user_id || '').replace('telegram:', '');\nconst source = raw.source || 'scheduled_task';\nconst sessionId = 'telegram:' + chatId;\nconst qualifiedUserId = 'telegram:' + userId;\n\nreturn [{ json: { userMessage: message, chatId, userId, sessionId, qualifiedUserId, source } }];"
       },
       "id": "format-task-input",
       "name": "Format Task Input",
@@ -912,7 +952,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT name, display_name, timezone, preferences, context, setup_done FROM user_profiles WHERE user_id = 'telegram:{{ $('Merge Input').first().json.userId }}' LIMIT 1",
+        "query": "SELECT name, display_name, timezone, preferences, context, setup_done FROM user_profiles WHERE user_id = '{{ $('Merge Input').first().json.qualifiedUserId }}' LIMIT 1",
         "options": {
           "queryBatching": "independently"
         }
@@ -937,7 +977,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT role, content FROM conversations WHERE session_id = 'telegram:{{ $('Merge Input').first().json.chatId }}' ORDER BY created_at DESC LIMIT 20",
+        "query": "SELECT role, content FROM conversations WHERE session_id = '{{ $('Merge Input').first().json.sessionId }}' ORDER BY created_at DESC LIMIT 20",
         "options": {
           "queryBatching": "independently"
         }
@@ -986,7 +1026,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build system prompt from loaded context\nconst soul = $('Load Soul').all().map(i => i.json);\n// Deduplicate: sequential node chaining causes cartesian product (6 soul × 6 agents = 36 items)\nconst agentsRaw = $('Load Agents Config').all().map(i => i.json);\nconst agents = [...new Map(agentsRaw.map(a => [a.key, a])).values()];\nconst user = $('Load User Profile').first()?.json || {};\n// Deduplicate conversation history (36x duplicated due to upstream cartesian product)\nconst historyRaw = $('Load Conversation History').all().map(i => i.json);\nconst seenHist = new Set();\nconst history = historyRaw.filter(h => { const k = h.role + ':' + h.content; if (seenHist.has(k)) return false; seenHist.add(k); return true; });\nconst mergeData = $('Merge Input').first().json;\nconst userMessage = mergeData.userMessage || '';\nconst chatId = mergeData.chatId;\nconst userId = mergeData.userId;\nconst inputSource = mergeData.source || 'telegram';\n\n// Build dynamic MCP server list from mcp_registry\nconst mcpRaw = $('Load MCP Servers').all().map(i => i.json);\nconst seenMcp = new Set();\nconst mcpServers = mcpRaw.filter(s => { if (!s.server_name || seenMcp.has(s.server_name)) return false; seenMcp.add(s.server_name); return true; });\nlet mcpServerList = '';\nif (mcpServers.length > 0) {\n  mcpServerList = '\\n\\n## Available MCP Skills:\\n' + mcpServers.map(s => {\n    const tools = Array.isArray(s.tools) ? s.tools.join(', ') : s.tools;\n    return `- ${s.server_name}: ${s.mcp_url} (tools: ${tools})${s.description ? ' — ' + s.description : ''}`;\n  }).join('\\n');\n}\n\n// Inject dynamic server list into mcp_instructions (replace any static server section)\nconst agentText = agents.map(a => {\n  if (a.key === 'mcp_instructions') {\n    const cleaned = a.content.replace(/\\n## (?:Available MCP (?:Servers|Skills)|Currently installed MCP Skills)[\\s\\S]*?(?=\\n## |$)/, '');\n    return `## ${a.key}\\n${cleaned}${mcpServerList}`;\n  }\n  return `## ${a.key}\\n${a.content}`;\n}).join('\\n\\n');\n\n// Build soul text\nconst soulText = soul.map(s => `## ${s.key}\\n${s.content}`).join('\\n\\n');\nconst userText = user.display_name \n  ? `Name: ${user.display_name} (${user.name})\\nTimezone: ${user.timezone}\\nKontext: ${user.context}\\nPrefs: ${JSON.stringify(user.preferences)}\\nSetup done: ${user.setup_done !== false ? 'true' : 'false'}`\n  : 'Unbekannter User';\n\n// Build conversation history\nconst historyText = history.reverse().map(h => `${h.role}: ${h.content}`).join('\\n');\n\n// Current date/time in user's timezone\nconst now = $now.setZone(user.timezone || 'UTC').toFormat('cccc, dd LLLL yyyy, HH:mm');\n\nconst scheduledHint = inputSource === 'scheduled_task' ? '\\n\\n# SCHEDULED TASK\\nThis message is a scheduled task that the user set up earlier. Execute the instructions thoroughly and send the result. Start your response with a brief ⏰ note that this is a scheduled task result.' : '';\n\n// Build active projects list (names only — content loaded on demand via Project Manager tool)\nconst projectsRaw = $('Load Active Projects').all().map(i => i.json);\nconst seenProj = new Set();\nconst activeProjects = projectsRaw.filter(p => { if (!p.name || seenProj.has(p.name)) return false; seenProj.add(p.name); return true; });\nlet projectsSection = '';\nif (activeProjects.length > 0) {\n  projectsSection = '\\n\\n# ACTIVE PROJECTS\\n' + activeProjects.map(p => {\n    const d = p.updated_at ? new Date(p.updated_at).toISOString().split('T')[0] : '';\n    return `- ${p.name} (updated: ${d})`;\n  }).join('\\n') + '\\nUse the Project Manager tool to read or update project details.';\n}\n\nconst systemPrompt = `# CURRENT TIME\\n${now}\\n\\n# SOUL\\n${soulText}\\n\\n# AGENT CONFIG\\n${agentText}\\n\\n# USER PROFILE\\n${userText}${scheduledHint}${projectsSection}\\n\\n# RECENT CONVERSATION\\n${historyText}`;\n\nreturn [{\n  json: {\n    systemPrompt,\n    userMessage,\n    chatId: String(chatId),\n    userId: String(userId),\n    sessionId: `telegram:${chatId}`\n  }\n}];"
+        "jsCode": "// Build system prompt from loaded context\nconst soul = $('Load Soul').all().map(i => i.json);\n// Deduplicate: sequential node chaining causes cartesian product (6 soul × 6 agents = 36 items)\nconst agentsRaw = $('Load Agents Config').all().map(i => i.json);\nconst agents = [...new Map(agentsRaw.map(a => [a.key, a])).values()];\nconst user = $('Load User Profile').first()?.json || {};\n// Deduplicate conversation history (36x duplicated due to upstream cartesian product)\nconst historyRaw = $('Load Conversation History').all().map(i => i.json);\nconst seenHist = new Set();\nconst history = historyRaw.filter(h => { const k = h.role + ':' + h.content; if (seenHist.has(k)) return false; seenHist.add(k); return true; });\nconst mergeData = $('Merge Input').first().json;\nconst userMessage = mergeData.userMessage || '';\nconst chatId = mergeData.chatId;\nconst userId = mergeData.userId;\nconst inputSource = mergeData.source || 'telegram';\n\n// Build dynamic MCP server list from mcp_registry\nconst mcpRaw = $('Load MCP Servers').all().map(i => i.json);\nconst seenMcp = new Set();\nconst mcpServers = mcpRaw.filter(s => { if (!s.server_name || seenMcp.has(s.server_name)) return false; seenMcp.add(s.server_name); return true; });\nlet mcpServerList = '';\nif (mcpServers.length > 0) {\n  mcpServerList = '\\n\\n## Available MCP Skills:\\n' + mcpServers.map(s => {\n    const tools = Array.isArray(s.tools) ? s.tools.join(', ') : s.tools;\n    return `- ${s.server_name}: ${s.mcp_url} (tools: ${tools})${s.description ? ' — ' + s.description : ''}`;\n  }).join('\\n');\n}\n\n// Inject dynamic server list into mcp_instructions (replace any static server section)\nconst agentText = agents.map(a => {\n  if (a.key === 'mcp_instructions') {\n    const cleaned = a.content.replace(/\\n## (?:Available MCP (?:Servers|Skills)|Currently installed MCP Skills)[\\s\\S]*?(?=\\n## |$)/, '');\n    return `## ${a.key}\\n${cleaned}${mcpServerList}`;\n  }\n  return `## ${a.key}\\n${a.content}`;\n}).join('\\n\\n');\n\n// Build soul text\nconst soulText = soul.map(s => `## ${s.key}\\n${s.content}`).join('\\n\\n');\nconst userText = user.display_name \n  ? `Name: ${user.display_name} (${user.name})\\nTimezone: ${user.timezone}\\nKontext: ${user.context}\\nPrefs: ${JSON.stringify(user.preferences)}\\nSetup done: ${user.setup_done !== false ? 'true' : 'false'}`\n  : 'Unbekannter User';\n\n// Build conversation history\nconst historyText = history.reverse().map(h => `${h.role}: ${h.content}`).join('\\n');\n\n// Current date/time in user's timezone\nconst now = $now.setZone(user.timezone || 'UTC').toFormat('cccc, dd LLLL yyyy, HH:mm');\n\nconst scheduledHint = inputSource === 'scheduled_task' ? '\\n\\n# SCHEDULED TASK\\nThis message is a scheduled task that the user set up earlier. Execute the instructions thoroughly and send the result. Start your response with a brief ⏰ note that this is a scheduled task result.' : '';\n\n// Build active projects list (names only — content loaded on demand via Project Manager tool)\nconst projectsRaw = $('Load Active Projects').all().map(i => i.json);\nconst seenProj = new Set();\nconst activeProjects = projectsRaw.filter(p => { if (!p.name || seenProj.has(p.name)) return false; seenProj.add(p.name); return true; });\nlet projectsSection = '';\nif (activeProjects.length > 0) {\n  projectsSection = '\\n\\n# ACTIVE PROJECTS\\n' + activeProjects.map(p => {\n    const d = p.updated_at ? new Date(p.updated_at).toISOString().split('T')[0] : '';\n    return `- ${p.name} (updated: ${d})`;\n  }).join('\\n') + '\\nUse the Project Manager tool to read or update project details.';\n}\n\nconst systemPrompt = `# CURRENT TIME\\n${now}\\n\\n# SOUL\\n${soulText}\\n\\n# AGENT CONFIG\\n${agentText}\\n\\n# USER PROFILE\\n${userText}${scheduledHint}${projectsSection}\\n\\n# RECENT CONVERSATION\\n${historyText}`;\n\nreturn [{\n  json: {\n    systemPrompt,\n    userMessage,\n    chatId: String(chatId),\n    userId: String(userId),\n    sessionId: mergeData.sessionId || `telegram:${chatId}`,\n    qualifiedUserId: mergeData.qualifiedUserId || `telegram:${userId}`,\n    source: inputSource,\n    _webhookSource: mergeData._webhookSource || false,\n    metadata: mergeData.metadata || {}\n  }\n}];"
       },
       "id": "build-prompt",
       "name": "Build System Prompt",
@@ -1045,7 +1085,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Save conversation to Supabase\nconst userMessage = $('Build System Prompt').first().json.userMessage;\nconst assistantMessage = $('AI Agent').first().json.output;\nconst sessionId = $('Build System Prompt').first().json.sessionId;\nconst userId = $('Build System Prompt').first().json.userId;\n\n// Mark onboarding as done after first response\nconst setupDone = $('Load User Profile').first()?.json?.setup_done;\nconst markSetupDone = setupDone === false;\n\n// Escape $ followed by digits — pg-promise interprets $N as parameter placeholders\nfunction pgSafe(s) { return (s || '').replace(/\\$/g, () => '$$'); }\n\nreturn [{\n  json: {\n    userMessage: pgSafe(userMessage),\n    assistantMessage: pgSafe(assistantMessage),\n    sessionId,\n    userId,\n    markSetupDone\n  }\n}];"
+        "jsCode": "// Save conversation to Supabase\nconst bsp = $('Build System Prompt').first().json;\nconst userMessage = bsp.userMessage;\nconst assistantMessage = $('AI Agent').first().json.output;\nconst sessionId = bsp.sessionId;\nconst userId = bsp.userId;\nconst qualifiedUserId = bsp.qualifiedUserId;\nconst source = bsp.source || 'telegram';\nconst _webhookSource = bsp._webhookSource || false;\nconst metadata = bsp.metadata || {};\n\n// Mark onboarding as done after first response\nconst setupDone = $('Load User Profile').first()?.json?.setup_done;\nconst markSetupDone = setupDone === false;\n\n// Escape $ followed by digits — pg-promise interprets $N as parameter placeholders\nfunction pgSafe(s) { return (s || '').replace(/\\$/g, () => '$$'); }\n\nreturn [{\n  json: {\n    userMessage: pgSafe(userMessage),\n    assistantMessage: pgSafe(assistantMessage),\n    sessionId,\n    userId,\n    qualifiedUserId,\n    source,\n    _webhookSource,\n    metadata,\n    markSetupDone\n  }\n}];"
       },
       "id": "prepare-save",
       "name": "Prepare Save",
@@ -1059,7 +1099,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO conversations (session_id, user_id, role, content) VALUES ('{{ $json.sessionId }}', '{{ $json.userId }}', 'user', '{{ $json.userMessage.replace(/'/g, \"''\").replace(/\\$/g, '$$') }}'); INSERT INTO conversations (session_id, user_id, role, content) VALUES ('{{ $json.sessionId }}', '{{ $json.userId }}', 'assistant', '{{ $json.assistantMessage.replace(/'/g, \"''\").replace(/\\$/g, '$$') }}'); {{ $json.markSetupDone ? \"UPDATE user_profiles SET setup_done = true WHERE user_id = 'telegram:\" + $json.userId + \"';\" : '' }}",
+        "query": "INSERT INTO conversations (session_id, user_id, role, content) VALUES ('{{ $json.sessionId }}', '{{ $json.userId }}', 'user', '{{ $json.userMessage.replace(/'/g, \"''\").replace(/\\$/g, '$$') }}'); INSERT INTO conversations (session_id, user_id, role, content) VALUES ('{{ $json.sessionId }}', '{{ $json.userId }}', 'assistant', '{{ $json.assistantMessage.replace(/'/g, \"''\").replace(/\\$/g, '$$') }}'); {{ $json.markSetupDone ? \"UPDATE user_profiles SET setup_done = true WHERE user_id = '\" + $json.qualifiedUserId + \"';\" : '' }}",
         "options": {
           "queryBatching": "independently"
         }
@@ -1474,6 +1514,117 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -300
+      ],
+      "webhookId": "webhook-agent-api"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook Trigger').first().json.body;\nconst message = body.message || '';\nconst rawUserId = body.user_id || 'anonymous';\nconst rawSessionId = body.session_id || '';\nconst source = body.source || 'api';\nconst metadata = body.metadata || {};\n\n// Build qualified IDs with source prefix\nconst qualifiedUserId = rawUserId.includes(':') ? rawUserId : `api:${rawUserId}`;\nconst sessionId = rawSessionId\n  ? (rawSessionId.includes(':') ? rawSessionId : `${source}:${rawSessionId}`)\n  : `${source}:${rawUserId}`;\n\nreturn [{ json: {\n  userMessage: message,\n  chatId: null,\n  userId: rawUserId,\n  sessionId,\n  qualifiedUserId,\n  source,\n  metadata,\n  _webhookSource: true\n} }];"
+      },
+      "id": "format-webhook-input",
+      "name": "Format Webhook Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._webhookSource }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Webhook"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json._webhookSource }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "response-router",
+      "name": "Response Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        4128,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, response: $('AI Agent').first().json.output, session_id: $json.sessionId, source: $json.source, metadata: $json.metadata } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4352,
+        -208
+      ]
     }
   ]
 }

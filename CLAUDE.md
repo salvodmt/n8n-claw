@@ -34,7 +34,9 @@ n8n-claw/
 │   ├── project-manager.json        # Persistent project memory across sessions
 │   ├── workflow-builder.json       # Builds general n8n automations (Claude Code CLI)
 │   ├── sub-agent-runner.json       # Runs expert sub-agents with dynamic personas
-│   └── agent-library-manager.json  # Install/remove expert agents from catalog
+│   ├── agent-library-manager.json  # Install/remove expert agents from catalog
+│   └── adapters/
+│       └── webhook-adapter.json    # Unified adapter: Slack + Teams + Paperclip + Generic
 │
 ├── supabase/
 │   ├── migrations/
@@ -79,12 +81,18 @@ Every time the agent receives a message, it queries `soul` and `agents` and buil
 
 ### Main Agent (`n8n-claw-agent.json`)
 
+The agent has two input paths (Telegram + Webhook) and routes responses accordingly:
+
 ```
-Telegram Trigger
+Telegram Trigger ──→ Route Media Type ──→ Normalize Message ──┐
+Webhook Trigger ───→ Format Webhook Input ────────────────────┤
+Scheduled Task Trigger ──→ Format Task Input ─────────────────┤
+                                                              ▼
+                                                         Merge Input
   → Load Soul (postgres)
   → Load Agents Config (postgres)
-  → Load User Profile (postgres)
-  → Load Conversation History (postgres)
+  → Load User Profile (postgres, uses qualifiedUserId)
+  → Load Conversation History (postgres, uses sessionId)
   → Build System Prompt (code node)
   → AI Agent (Claude Sonnet)
       ├── Memory Search (toolCode)
@@ -99,10 +107,34 @@ Telegram Trigger
       ├── Project Manager (toolWorkflow → Project Manager)
       ├── Expert Agent (toolWorkflow → Sub-Agent Runner)
       └── Agent Library (toolWorkflow → Agent Library Manager)
-  → Save Conversation (postgres)
-  → Save Daily Log (postgres)
-  → Telegram Reply
+  → Prepare Save → Save Conversation + Save Daily Log
+  → Response Router
+      ├── _webhookSource=true → Respond to Webhook (JSON)
+      └── default → Split Long Message → Telegram Reply
 ```
+
+**Dual-ID pattern**: Input nodes output both raw IDs (`chatId`/`userId` for Telegram API) and qualified IDs (`sessionId`/`qualifiedUserId` with source prefix for DB lookups). This keeps the core source-agnostic.
+
+### Webhook API
+
+External systems can call the agent via HTTP:
+
+```
+POST {{N8N_URL}}/webhook/agent
+Header: X-API-Key: {{WEBHOOK_SECRET}}
+Body: { "message": "...", "user_id": "...", "session_id": "...", "source": "...", "metadata": {} }
+Response: { "success": true, "response": "...", "session_id": "...", "metadata": {} }
+```
+
+### Webhook Adapter (`workflows/adapters/webhook-adapter.json`)
+
+A unified adapter workflow with multiple triggers for connecting external systems:
+
+- **Webhook Trigger** (active) — generic HTTP + Paperclip format
+- **Slack Trigger** (disabled) — native n8n Slack integration
+- **Teams Trigger** (disabled) — native n8n Teams integration
+
+Each trigger has a mapper node → calls `/webhook/agent` → routes response back via `metadata._responseChannel`. Imported by setup.sh but **not activated** — user enables what they need.
 
 ### MCP Builder Pattern
 
@@ -235,6 +267,7 @@ All sensitive values use `{{PLACEHOLDER}}` format. `setup.sh` replaces these at 
 | `{{N8N_INTERNAL_URL}}` | `http://172.17.0.1:5678` (Docker host IP) |
 | `{{N8N_API_KEY}}` | n8n API key |
 | `{{TELEGRAM_CHAT_ID}}` | User's Telegram chat ID |
+| `{{WEBHOOK_SECRET}}` | API key for webhook authentication (auto-generated) |
 | `REPLACE_WITH_YOUR_CREDENTIAL_ID` | Replaced per credential type after import |
 
 ### Workflow IDs

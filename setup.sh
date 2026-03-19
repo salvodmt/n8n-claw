@@ -154,6 +154,12 @@ if [ -z "$SUPABASE_JWT_SECRET" ]; then
   set_env "SUPABASE_JWT_SECRET" "$SUPABASE_JWT_SECRET"
 fi
 
+# Webhook API secret for external integrations
+if [ -z "$WEBHOOK_SECRET" ]; then
+  WEBHOOK_SECRET=$(openssl rand -hex 32)
+  set_env "WEBHOOK_SECRET" "$WEBHOOK_SECRET"
+fi
+
 # SearXNG secret key (only patch if placeholder still present)
 if grep -q '{{SEARXNG_SECRET_KEY}}' searxng/settings.yml 2>/dev/null; then
   SEARXNG_SECRET=$(openssl rand -hex 32)
@@ -556,7 +562,7 @@ for wf in data.get('data', []):
     print(wf['name'])
 " 2>/dev/null)
 
-  for f in workflows/*.json; do
+  for f in workflows/*.json workflows/adapters/*.json; do
     [ -f "$f" ] || continue
     wf_name=$(python3 -c "import json; print(json.load(open('$f')).get('name','?'))" 2>/dev/null)
 
@@ -578,6 +584,7 @@ for wf in data.get('data', []):
       -e "s|{{SUPABASE_ANON_KEY}}|${SUPABASE_ANON_KEY}|g" \
       -e "s|{{TELEGRAM_CHAT_ID}}|${TELEGRAM_CHAT_ID}|g" \
       -e "s|{{CREDENTIAL_FORM_WEBHOOK_ID}}|${CREDENTIAL_FORM_WEBHOOK_ID}|g" \
+      -e "s|{{WEBHOOK_SECRET}}|${WEBHOOK_SECRET}|g" \
       "$out"
 
     resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
@@ -595,7 +602,7 @@ else
 echo -e "\n${GREEN}📦 Importing workflows...${NC}"
 mkdir -p workflows/deployed
 
-for f in workflows/*.json; do
+for f in workflows/*.json workflows/adapters/*.json; do
   out="workflows/deployed/$(basename $f)"
   cp "$f" "$out"
   # Basic placeholder replacements
@@ -608,6 +615,7 @@ for f in workflows/*.json; do
     -e "s|{{SUPABASE_ANON_KEY}}|${SUPABASE_ANON_KEY}|g" \
     -e "s|{{TELEGRAM_CHAT_ID}}|${TELEGRAM_CHAT_ID}|g" \
     -e "s|{{CREDENTIAL_FORM_WEBHOOK_ID}}|${CREDENTIAL_FORM_WEBHOOK_ID}|g" \
+    -e "s|{{WEBHOOK_SECRET}}|${WEBHOOK_SECRET}|g" \
     "$out"
   # Credential ID replacements — proper JSON manipulation (sed can't match
   # across line breaks, and "id"/"name" are on separate lines in the JSON)
@@ -633,7 +641,7 @@ with open(f, 'w') as fh:
     json.dump(wf, fh, indent=2, ensure_ascii=False)
 " "$out" "${TELEGRAM_CRED_ID:-}" "${POSTGRES_CRED_ID:-}" "${ANTHROPIC_CRED_ID:-}" "${OPENAI_CRED_ID:-}"
 done
-IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager agent-library-manager sub-agent-runner credential-form memory-consolidation background-checker heartbeat n8n-claw-agent"
+IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager agent-library-manager sub-agent-runner credential-form memory-consolidation background-checker heartbeat webhook-adapter n8n-claw-agent"
 
 # n8n Public API settings whitelist — the PUT endpoint rejects any settings
 # field not in its OpenAPI schema (additionalProperties: false), even though
