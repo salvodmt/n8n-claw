@@ -483,6 +483,12 @@ creds=json.load(sys.stdin).get('data',[])
 for c in creds:
     if c.get('type')=='httpHeaderAuth': print(c['id']); break
 " 2>/dev/null)
+EXISTING_SLACK_ID=$(echo "$EXISTING_CREDS" | python3 -c "
+import sys,json
+creds=json.load(sys.stdin).get('data',[])
+for c in creds:
+    if c.get('type')=='slackApi': print(c['id']); break
+" 2>/dev/null)
 if [ -n "$EXISTING_ANTHROPIC_ID" ]; then
   ANTHROPIC_CRED_ID="$EXISTING_ANTHROPIC_ID"
   echo "  ✅ Anthropic API → ${ANTHROPIC_CRED_ID} (existing)"
@@ -618,15 +624,22 @@ if sys.argv[5] and sys.argv[5] not in ('',):
     mapping['openAiApi'] = sys.argv[5]
 if len(sys.argv) > 6 and sys.argv[6] and sys.argv[6] not in ('', 'REPLACE_WITH_YOUR_CREDENTIAL_ID'):
     mapping['httpHeaderAuth'] = sys.argv[6]
+slack_id = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else ''
 with open(f) as fh:
     wf = json.load(fh)
 for node in wf.get('nodes', []):
     for cred_type, cred_data in node.get('credentials', {}).items():
         if cred_type in mapping:
             cred_data['id'] = mapping[cred_type]
+    # If Slack credential exists, patch + enable Slack nodes
+    if slack_id:
+        for sk in ('slackOAuth2Api', 'slackApi'):
+            if sk in node.get('credentials', {}):
+                node['credentials'][sk]['id'] = slack_id
+                node.pop('disabled', None)
 with open(f, 'w') as fh:
     json.dump(wf, fh, indent=2, ensure_ascii=False)
-" "$out" "${TELEGRAM_CRED_ID:-}" "${POSTGRES_CRED_ID:-}" "${ANTHROPIC_CRED_ID:-}" "${OPENAI_CRED_ID:-}" "${HEADERAUTH_CRED_ID:-}"
+" "$out" "${TELEGRAM_CRED_ID:-}" "${POSTGRES_CRED_ID:-}" "${ANTHROPIC_CRED_ID:-}" "${OPENAI_CRED_ID:-}" "${HEADERAUTH_CRED_ID:-}" "${EXISTING_SLACK_ID:-}"
 
     resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
       -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
@@ -674,15 +687,22 @@ if sys.argv[5] and sys.argv[5] not in ('',):
     mapping['openAiApi'] = sys.argv[5]
 if len(sys.argv) > 6 and sys.argv[6] and sys.argv[6] not in ('', 'REPLACE_WITH_YOUR_CREDENTIAL_ID'):
     mapping['httpHeaderAuth'] = sys.argv[6]
+slack_id = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else ''
 with open(f) as fh:
     wf = json.load(fh)
 for node in wf.get('nodes', []):
     for cred_type, cred_data in node.get('credentials', {}).items():
         if cred_type in mapping:
             cred_data['id'] = mapping[cred_type]
+    # If Slack credential exists, patch + enable Slack nodes
+    if slack_id:
+        for sk in ('slackOAuth2Api', 'slackApi'):
+            if sk in node.get('credentials', {}):
+                node['credentials'][sk]['id'] = slack_id
+                node.pop('disabled', None)
 with open(f, 'w') as fh:
     json.dump(wf, fh, indent=2, ensure_ascii=False)
-" "$out" "${TELEGRAM_CRED_ID:-}" "${POSTGRES_CRED_ID:-}" "${ANTHROPIC_CRED_ID:-}" "${OPENAI_CRED_ID:-}" "${HEADERAUTH_CRED_ID:-}"
+" "$out" "${TELEGRAM_CRED_ID:-}" "${POSTGRES_CRED_ID:-}" "${ANTHROPIC_CRED_ID:-}" "${OPENAI_CRED_ID:-}" "${HEADERAUTH_CRED_ID:-}" "${EXISTING_SLACK_ID:-}"
 done
 IMPORT_ORDER="mcp-client reminder-factory reminder-runner mcp-weather-example workflow-builder mcp-builder mcp-library-manager agent-library-manager sub-agent-runner credential-form memory-consolidation background-checker heartbeat webhook-adapter n8n-claw-agent"
 
