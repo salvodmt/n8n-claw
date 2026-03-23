@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/10b7b93d-f482-47c1-a144-80a1b9d1be16
 - [Webhook API & External Integrations](#webhook-api--external-integrations)
 - [MCP Skills Library](#mcp-skills-library)
 - [Expert Agents](#expert-agents)
+- [OpenClaw Integration](#openclaw-integration)
 - [Building custom MCP Skills](#building-custom-mcp-skills)
 - [Memory](#memory)
 - [Project Memory](#project-memory)
@@ -55,6 +56,7 @@ Talk to your agent in natural language — it manages tasks, remembers context a
 - **Web search** — searches the web via built-in SearXNG instance (no API key needed)
 - **Web reader** — reads webpages as clean markdown via Crawl4AI (JS rendering, no boilerplate)
 - **Project memory** — persistent markdown documents for tracking ongoing work across conversations
+- **OpenClaw integration** — delegate coding tasks to an autonomous AI agent that can build websites, apps, and run shell commands
 - **Extensible** — add new skills and capabilities through natural language or from the skill catalog
 
 ## Architecture
@@ -432,6 +434,19 @@ The Library Manager fetches skill templates from GitHub, imports the workflows i
 
 > After installing a skill: **deactivate → reactivate** the new MCP workflow in n8n UI (required due to a webhook registration bug in n8n).
 
+**Available skills:**
+
+| Skill | Category | Description |
+|---|---|---|
+| Weather (Open-Meteo) | Productivity | Weather forecasts and current conditions |
+| Todoist | Productivity | Task management via Todoist API |
+| News (NewsAPI) | Productivity | Search news articles from 80,000+ sources |
+| NocoDB CRM | Productivity | Database/CRM operations on NocoDB instances |
+| Vikunja | Productivity | Task and project management via Vikunja |
+| OpenClaw | Communication | Connect to an OpenClaw AI agent instance |
+
+See the full catalog at [n8n-claw-templates](https://github.com/freddy-schuetz/n8n-claw-templates).
+
 **Skills with API keys:** Some skills require an API key (e.g. NewsAPI). When you install one, the agent sends you a secure one-time link via Telegram. Click it, enter your key — done. The key is stored in the database and the skill reads it at runtime. Links expire after 10 minutes and can only be used once.
 
 > "Install news-newsapi"
@@ -498,6 +513,37 @@ The agent automatically picks the right expert based on your request — or you 
 Install more experts from the [agent catalog](https://github.com/freddy-schuetz/n8n-claw-agents) or ask the community to contribute new ones.
 
 **Status updates:** During long-running expert tasks, the agent sends you Telegram progress updates so you know what's happening (e.g. "Starting research expert...").
+
+</details>
+
+---
+
+<details>
+<summary>
+
+## OpenClaw Integration
+
+</summary>
+
+Connect n8n-claw to an [OpenClaw](https://github.com/claw-project/openclaw) instance and unlock a completely new class of capabilities. OpenClaw is an autonomous AI agent with full access to a Linux system — it can write code, build websites, deploy applications, manage files, run shell commands, and work on complex multi-step software projects.
+
+With the OpenClaw skill installed, n8n-claw can delegate tasks to OpenClaw and get the results back:
+
+> "Ask OpenClaw to build a landing page for our new product"
+> "Let OpenClaw create a Python script that monitors our server uptime"
+> "Send this to OpenClaw: refactor the auth module and write tests"
+
+**How it works:**
+- n8n-claw sends messages to OpenClaw's Gateway API (OpenAI-compatible)
+- Conversations are persistent — OpenClaw remembers context across messages via session keys
+- n8n-claw identifies itself with a configurable caller ID so OpenClaw knows who's talking
+
+**Setup:**
+1. Install the OpenClaw skill: *"Install openclaw"*
+2. Enter your OpenClaw Gateway URL, API token, and caller ID via the credential form
+3. Start delegating tasks
+
+This turns n8n-claw from a workflow-based agent into a bridge to a full autonomous coding agent — combining n8n-claw's strengths (memory, reminders, task management, Telegram interface, MCP skills) with OpenClaw's ability to execute arbitrary code and build software.
 
 </details>
 
