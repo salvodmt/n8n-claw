@@ -936,6 +936,7 @@
       "name": "Load Agents Config",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
+      "executeOnce": true,
       "position": [
         1424,
         -16
@@ -961,6 +962,7 @@
       "name": "Load User Profile",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
+      "executeOnce": true,
       "position": [
         1648,
         -16
@@ -986,6 +988,7 @@
       "name": "Load Conversation History",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
+      "executeOnce": true,
       "position": [
         1872,
         -16
@@ -1011,6 +1014,7 @@
       "name": "Load MCP Servers",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
+      "executeOnce": true,
       "position": [
         1984,
         -16
@@ -1411,6 +1415,7 @@
       "name": "Load Active Projects",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
+      "executeOnce": true,
       "position": [
         2096,
         -16
