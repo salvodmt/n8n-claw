@@ -1172,7 +1172,7 @@ docker logs n8n-claw-rest   # PostgREST
 
 </summary>
 
-The WorkflowBuilder tool lets your agent build complex n8n workflows using Claude Code CLI. This requires additional setup:
+The WorkflowBuilder tool lets your agent build complex n8n workflows using Claude Code CLI. Since n8n runs inside Docker, the Claude Code node connects to the **host machine** via SSH where the CLI is installed.
 
 ### 1. Install the community node
 
@@ -1181,10 +1181,12 @@ In n8n UI → Settings → Community Nodes → Install:
 n8n-nodes-claude-code-cli
 ```
 
-### 2. Install Claude Code on your VPS
+### 2. Install Claude Code on your VPS host
+
+> **Important:** Install this on the VPS itself (the host machine), **not** inside the Docker container.
 
 ```bash
-# Install Node.js if needed
+# Install Node.js 20+ if not already present
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 
@@ -1195,18 +1197,30 @@ npm install -g @anthropic-ai/claude-code
 claude --version
 ```
 
-### 3. Configure in n8n
+Set your Anthropic API key in the host's shell environment (e.g. `/root/.bashrc`):
 
-- Open the WorkflowBuilder workflow
-- The Claude Code node needs access to the CLI
-- Set `ANTHROPIC_API_KEY` environment variable in your n8n container:
-
-```yaml
-# Add to docker-compose.yml under n8n environment:
-- ANTHROPIC_API_KEY=your_key_here
+```bash
+echo 'export ANTHROPIC_API_KEY=your_key_here' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-Then restart: `docker compose up -d n8n`
+### 3. Create the SSH credential in n8n
+
+The Claude Code node uses SSH to reach the CLI on the host. You need to create an SSH credential:
+
+1. In n8n UI → **Credentials** → **Add Credential**
+2. Search for **Claude Code SSH** (comes with the community node)
+3. Configure:
+   - **Host:** `172.17.0.1` (this is how Docker containers reach the host machine)
+   - **Port:** `22`
+   - **Username:** `root` (or whichever user has Claude Code installed)
+   - **Authentication:** Password or SSH Private Key
+4. Save with the name **`Claude Code Runner SSH`** (must match exactly)
+
+### 4. Activate the workflow
+
+1. Open the **WorkflowBuilder** workflow in n8n
+2. Click **Activate** (toggle in the top right)
 
 > Without this setup, the WorkflowBuilder tool won't function — but all other agent capabilities work fine without it.
 
