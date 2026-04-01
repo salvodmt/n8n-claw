@@ -1154,6 +1154,22 @@ Use `--force` when you want to change your agent's name, language, communication
 **DB empty / Load Soul returns nothing?**
 → Re-run seed: `./setup.sh` (skips already-set config)
 
+**MCP Skills fail with `ECONNREFUSED 127.0.1.1:443`?**
+→ Many cloud providers (Hostinger, etc.) map the server hostname to `127.0.1.1` in `/etc/hosts`. When n8n tries to call its own webhook URL, it resolves to that address instead of the real IP. Fix:
+```bash
+# Find your real IP
+curl -4 ifconfig.me
+
+# Fix /etc/hosts — replace 127.0.1.1 with your real IP
+sed -i 's/^127\.0\.1\.1\(.*\)/YOUR_REAL_IP\1/' /etc/hosts
+
+# If your server uses cloud-init, also fix the template for persistence across reboots:
+sed -i 's/^127\.0\.1\.1\(.*\)/YOUR_REAL_IP\1/' /etc/cloud/templates/hosts.debian.tmpl
+
+# Restart n8n
+docker restart n8n-claw
+```
+
 **Logs:**
 ```bash
 docker logs n8n-claw        # n8n
