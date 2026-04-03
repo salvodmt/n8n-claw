@@ -1606,8 +1606,13 @@ SENDING FILES TO THE USER:
   [send_file: http://file-bridge:3200/files/<file_ref_id>]
 - The marker is automatically detected and the file is sent as a Telegram document
 - The marker text is stripped from the visible message
-- You can also use any direct download URL, not just File Bridge URLs
 - Only ONE file per response is supported
+
+DOWNLOADING FILES FROM CLOUD SERVICES:
+- When the user asks you to send/download a file from Google Drive, Nextcloud, or similar services, use the download_file tool (NOT read_file)
+- download_file stores the file in File Bridge and returns a [send_file: ...] link you can include in your response
+- Do NOT use direct Google Drive/Nextcloud URLs in [send_file:] — they require auth and will fail
+- The ONLY URLs that work in [send_file:] are File Bridge URLs (http://file-bridge:3200/files/...) or truly public URLs
 
 IMPORTANT RULES:
 - file_ref IDs expire after 24 hours — do not reference old file_refs
