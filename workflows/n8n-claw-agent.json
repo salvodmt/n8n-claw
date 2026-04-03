@@ -108,7 +108,7 @@
       "main": [
         [
           {
-            "node": "Normalize Message",
+            "node": "Merge File Paths",
             "type": "main",
             "index": 0
           }
@@ -135,7 +135,7 @@
       "main": [
         [
           {
-            "node": "Normalize Message",
+            "node": "Merge File Paths",
             "type": "main",
             "index": 0
           }
@@ -663,6 +663,28 @@
         [
           {
             "node": "Split Long Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Merge File Paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge File Paths": {
+      "main": [
+        [
+          {
+            "node": "Normalize Message",
             "type": "main",
             "index": 0
           }
@@ -1933,6 +1955,20 @@
           "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
           "name": "Telegram Bot"
         }
+      }
+    },
+    {
+      "id": "merge-file-paths",
+      "name": "Merge File Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        760,
+        -16
+      ],
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "input1"
       }
     }
   ]
