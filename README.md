@@ -1223,15 +1223,7 @@ n8n-nodes-claude-code-cli
 > **Important:** Install this on the VPS itself (the host machine), **not** inside the Docker container.
 
 ```bash
-# Install Node.js 20+ if not already present
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
-
-# Install Claude Code CLI globally
-npm install -g @anthropic-ai/claude-code
-
-# Verify
-claude --version
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
 Set your Anthropic API key in the host's shell environment (e.g. `/root/.bashrc`):
