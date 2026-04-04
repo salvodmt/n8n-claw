@@ -227,7 +227,8 @@ echo "  3) OpenRouter"
 echo "  4) Ollama (local, no API key needed)"
 echo "  5) DeepSeek"
 echo "  6) Google Gemini"
-echo "  7) Other OpenAI-compatible endpoint"
+echo "  7) Mistral AI (EU-hosted, GDPR-compliant)"
+echo "  8) Other OpenAI-compatible endpoint"
 echo ""
 SKIP_LLM=false
 LLM_PROVIDER="${LLM_PROVIDER:-}"
@@ -253,7 +254,8 @@ if [ -z "$LLM_PROVIDER" ] || [[ "$LLM_PROVIDER" == "your_"* ]]; then
     4) LLM_PROVIDER="ollama" ;;
     5) LLM_PROVIDER="deepseek" ;;
     6) LLM_PROVIDER="gemini" ;;
-    7) LLM_PROVIDER="openai_compatible" ;;
+    7) LLM_PROVIDER="mistral" ;;
+    8) LLM_PROVIDER="openai_compatible" ;;
     *) LLM_PROVIDER="anthropic" ;;
   esac
 fi
@@ -309,6 +311,12 @@ if [ "$SKIP_LLM" = "false" ]; then
       fi
       LLM_MODEL="${LLM_MODEL:-gemini-3-flash-preview}"
       ;;
+    mistral)
+      if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
+        ask "LLM_API_KEY" "Mistral API Key (from console.mistral.ai)" "" 1
+      fi
+      LLM_MODEL="${LLM_MODEL:-mistral-large-latest}"
+      ;;
     openai_compatible)
       if [ -z "$LLM_BASE_URL" ] || [[ "$LLM_BASE_URL" == "your_"* ]]; then
         read -rp "  Base URL (e.g. http://localhost:8080/v1): " LLM_BASE_URL
@@ -334,6 +342,7 @@ case "${LLM_PROVIDER:-anthropic}" in
   ollama)            LLM_CRED_NAME="Ollama";             LLM_CRED_TYPE="ollamaApi" ;;
   deepseek)          LLM_CRED_NAME="DeepSeek API";       LLM_CRED_TYPE="deepSeekApi" ;;
   gemini)            LLM_CRED_NAME="Google Gemini API";  LLM_CRED_TYPE="googlePalmApi" ;;
+  mistral)           LLM_CRED_NAME="Mistral API";        LLM_CRED_TYPE="mistralCloudApi" ;;
   openai_compatible) LLM_CRED_NAME="LLM API";            LLM_CRED_TYPE="openAiApi" ;;
 esac
 
@@ -755,6 +764,25 @@ for c in creds:
       [ -z "$LLM_CRED_ID" ] && echo -e "  ${YELLOW}⚠️  Google Gemini credential failed — add manually in n8n UI${NC}" || echo "  ✅ Google Gemini API → ${LLM_CRED_ID} (created)"
     fi
     ;;
+  mistral)
+    EXISTING_MISTRAL_ID=$(echo "$EXISTING_CREDS" | python3 -c "
+import sys,json
+creds=json.load(sys.stdin).get('data',[])
+for c in creds:
+    if c.get('type')=='mistralCloudApi': print(c['id']); break
+" 2>/dev/null)
+    if [ -n "$EXISTING_MISTRAL_ID" ]; then
+      LLM_CRED_ID="$EXISTING_MISTRAL_ID"
+      update_cred "$LLM_CRED_ID" "Mistral API" "mistralCloudApi" "{\"apiKey\":\"${LLM_API_KEY}\"}"
+      echo "  ✅ Mistral API → ${LLM_CRED_ID} (existing, updated)"
+    else
+      LLM_CRED_ID=$(create_cred "Mistral API" "mistralCloudApi" "{\"apiKey\":\"${LLM_API_KEY}\"}")
+      if [ -z "$LLM_CRED_ID" ]; then
+        LLM_CRED_ID=$(import_cred "Mistral API" "mistralCloudApi" "{\"apiKey\":\"${LLM_API_KEY}\"}")
+      fi
+      [ -z "$LLM_CRED_ID" ] && echo -e "  ${YELLOW}⚠️  Mistral credential failed — add manually in n8n UI${NC}" || echo "  ✅ Mistral API → ${LLM_CRED_ID} (created)"
+    fi
+    ;;
   openai_compatible)
     # Uses openAiApi credential type with a distinct name
     LLM_CRED_ID=$(create_cred "LLM API" "openAiApi" "{\"apiKey\":\"${LLM_API_KEY}\"}")
@@ -943,6 +971,7 @@ PROVIDERS = {
     'ollama': {'type': '@n8n/n8n-nodes-langchain.lmChatOllama', 'ver': 1, 'cred': 'ollamaApi', 'model_key': 'model', 'tokens_key': 'numPredict', 'use_rl': False, 'dn': 'Ollama Chat Model'},
     'deepseek': {'type': '@n8n/n8n-nodes-langchain.lmChatDeepSeek', 'ver': 1, 'cred': 'deepSeekApi', 'model_key': 'model', 'tokens_key': 'maxTokens', 'use_rl': False, 'dn': 'DeepSeek Chat Model'},
     'gemini': {'type': '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', 'ver': 1, 'cred': 'googlePalmApi', 'model_key': 'modelName', 'tokens_key': 'maxOutputTokens', 'use_rl': False, 'dn': 'Google Gemini Chat Model'},
+    'mistral': {'type': '@n8n/n8n-nodes-langchain.lmChatMistralCloud', 'ver': 1, 'cred': 'mistralCloudApi', 'model_key': 'model', 'tokens_key': 'maxTokens', 'use_rl': False, 'dn': 'Mistral Cloud Chat Model'},
     'openai_compatible': {'type': '@n8n/n8n-nodes-langchain.lmChatOpenAi', 'ver': 1.3, 'cred': 'openAiApi', 'model_key': 'model', 'tokens_key': 'maxTokens', 'use_rl': True, 'dn': 'OpenAI Chat Model'},
 }
 if provider not in PROVIDERS:
@@ -1125,6 +1154,15 @@ PROVIDERS = {
         'tokens_key': 'maxOutputTokens',
         'use_rl': False,
         'dn': 'Google Gemini Chat Model',
+    },
+    'mistral': {
+        'type': '@n8n/n8n-nodes-langchain.lmChatMistralCloud',
+        'ver': 1,
+        'cred': 'mistralCloudApi',
+        'model_key': 'model',
+        'tokens_key': 'maxTokens',
+        'use_rl': False,
+        'dn': 'Mistral Cloud Chat Model',
     },
     'openai_compatible': {
         'type': '@n8n/n8n-nodes-langchain.lmChatOpenAi',
@@ -1633,6 +1671,7 @@ if [ "$INSTALL_MODE" = "update" ] && [ "$FORCE_FLAG" != "--force" ] && [ -z "${E
     ollama)           LLM_ENDPOINT="${LLM_BASE_URL:-http://172.17.0.1:11434}/v1/chat/completions"; LLM_PROVIDER_FAMILY="openai_compatible"; LLM_DB_KEY="${LLM_API_KEY:-ollama}"; LLM_DB_MODEL="${LLM_MODEL:-llama3.2}" ;;
     deepseek)         LLM_ENDPOINT="https://api.deepseek.com/v1/chat/completions"; LLM_PROVIDER_FAMILY="openai_compatible"; LLM_DB_KEY="${LLM_API_KEY}"; LLM_DB_MODEL="${LLM_MODEL:-deepseek-chat}" ;;
     gemini)           LLM_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"; LLM_PROVIDER_FAMILY="openai_compatible"; LLM_DB_KEY="${LLM_API_KEY}"; LLM_DB_MODEL="${LLM_MODEL:-gemini-3-flash-preview}" ;;
+    mistral)          LLM_ENDPOINT="https://api.mistral.ai/v1/chat/completions"; LLM_PROVIDER_FAMILY="openai_compatible"; LLM_DB_KEY="${LLM_API_KEY}"; LLM_DB_MODEL="${LLM_MODEL:-mistral-large-latest}" ;;
     openai_compatible) LLM_ENDPOINT="${LLM_BASE_URL}/chat/completions"; LLM_PROVIDER_FAMILY="openai_compatible"; LLM_DB_KEY="${LLM_API_KEY:-not-needed}"; LLM_DB_MODEL="${LLM_MODEL}" ;;
   esac
   if [ -n "$LLM_DB_KEY" ]; then
@@ -1878,6 +1917,12 @@ case "$LLM_PROVIDER_DB" in
     LLM_PROVIDER_FAMILY="openai_compatible"
     LLM_DB_KEY="${LLM_API_KEY}"
     LLM_DB_MODEL="${LLM_MODEL:-gemini-3-flash-preview}"
+    ;;
+  mistral)
+    LLM_ENDPOINT="https://api.mistral.ai/v1/chat/completions"
+    LLM_PROVIDER_FAMILY="openai_compatible"
+    LLM_DB_KEY="${LLM_API_KEY}"
+    LLM_DB_MODEL="${LLM_MODEL:-mistral-large-latest}"
     ;;
   openai_compatible)
     LLM_ENDPOINT="${LLM_BASE_URL}/chat/completions"
