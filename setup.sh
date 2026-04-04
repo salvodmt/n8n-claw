@@ -229,7 +229,20 @@ echo "  5) DeepSeek"
 echo "  6) Google Gemini"
 echo "  7) Other OpenAI-compatible endpoint"
 echo ""
+SKIP_LLM=false
 LLM_PROVIDER="${LLM_PROVIDER:-}"
+if [ -n "$LLM_PROVIDER" ] && [[ "$LLM_PROVIDER" != "your_"* ]] && [ "$FORCE_FLAG" = "--force" ]; then
+  # --force on existing install: ask before reconfiguring
+  read -rp "  Change LLM provider? (current: ${LLM_PROVIDER}) (y/N): " CHANGE_LLM
+  if [[ "${CHANGE_LLM,,}" =~ ^y ]]; then
+    LLM_PROVIDER=""
+    LLM_API_KEY=""
+    LLM_MODEL=""
+    LLM_BASE_URL=""
+  else
+    SKIP_LLM=true
+  fi
+fi
 if [ -z "$LLM_PROVIDER" ] || [[ "$LLM_PROVIDER" == "your_"* ]]; then
   read -rp "  Choose provider [1]: " LLM_CHOICE
   LLM_CHOICE="${LLM_CHOICE:-1}"
@@ -244,69 +257,74 @@ if [ -z "$LLM_PROVIDER" ] || [[ "$LLM_PROVIDER" == "your_"* ]]; then
     *) LLM_PROVIDER="anthropic" ;;
   esac
 fi
-set_env LLM_PROVIDER "$LLM_PROVIDER"
 
-# Provider-specific prompts
-case "$LLM_PROVIDER" in
-  anthropic)
-    ask "ANTHROPIC_API_KEY" "Anthropic API Key (from console.anthropic.com)" "" 1
-    LLM_API_KEY="$ANTHROPIC_API_KEY"
-    LLM_MODEL="${LLM_MODEL:-claude-sonnet-4-6}"
-    ;;
-  openai)
-    if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
-      ask "LLM_API_KEY" "OpenAI API Key (from platform.openai.com)" "" 1
-    fi
-    LLM_MODEL="${LLM_MODEL:-gpt-5.4-mini}"
-    # Reuse as OPENAI_API_KEY for vision/transcription too
-    OPENAI_API_KEY="$LLM_API_KEY"
-    set_env OPENAI_API_KEY "$OPENAI_API_KEY"
-    ;;
-  openrouter)
-    if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
-      ask "LLM_API_KEY" "OpenRouter API Key (from openrouter.ai/keys)" "" 1
-    fi
-    LLM_MODEL="${LLM_MODEL:-anthropic/claude-sonnet-4-6}"
-    ;;
-  ollama)
-    if [ -z "$LLM_BASE_URL" ] || [[ "$LLM_BASE_URL" == "your_"* ]]; then
-      # Detect OS for Docker networking default
-      if [[ "$(uname -s)" == "Linux" ]]; then
-        OLLAMA_DEFAULT="http://172.17.0.1:11434"
-      else
-        OLLAMA_DEFAULT="http://host.docker.internal:11434"
+if [ "$SKIP_LLM" = "false" ]; then
+  set_env LLM_PROVIDER "$LLM_PROVIDER"
+
+  # Provider-specific prompts
+  case "$LLM_PROVIDER" in
+    anthropic)
+      ask "ANTHROPIC_API_KEY" "Anthropic API Key (from console.anthropic.com)" "" 1
+      LLM_API_KEY="$ANTHROPIC_API_KEY"
+      LLM_MODEL="${LLM_MODEL:-claude-sonnet-4-6}"
+      ;;
+    openai)
+      if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
+        ask "LLM_API_KEY" "OpenAI API Key (from platform.openai.com)" "" 1
       fi
-      read -rp "  Ollama Base URL [${OLLAMA_DEFAULT}]: " LLM_BASE_URL_INPUT
-      LLM_BASE_URL="${LLM_BASE_URL_INPUT:-$OLLAMA_DEFAULT}"
-    fi
-    LLM_API_KEY="${LLM_API_KEY:-ollama}"
-    LLM_MODEL="${LLM_MODEL:-llama3.2}"
-    ;;
-  deepseek)
-    if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
-      ask "LLM_API_KEY" "DeepSeek API Key (from platform.deepseek.com)" "" 1
-    fi
-    LLM_MODEL="${LLM_MODEL:-deepseek-chat}"
-    ;;
-  gemini)
-    if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
-      ask "LLM_API_KEY" "Google Gemini API Key (from aistudio.google.com)" "" 1
-    fi
-    LLM_MODEL="${LLM_MODEL:-models/gemini-2.5-flash}"
-    ;;
-  openai_compatible)
-    if [ -z "$LLM_BASE_URL" ] || [[ "$LLM_BASE_URL" == "your_"* ]]; then
-      read -rp "  Base URL (e.g. http://localhost:8080/v1): " LLM_BASE_URL
-    fi
-    read -rp "  API Key (Enter to skip if not needed): " LLM_API_KEY_INPUT
-    LLM_API_KEY="${LLM_API_KEY_INPUT:-not-needed}"
-    read -rp "  Model name: " LLM_MODEL
-    ;;
-esac
-set_env LLM_API_KEY "$LLM_API_KEY"
-set_env LLM_MODEL "$LLM_MODEL"
-[ -n "$LLM_BASE_URL" ] && set_env LLM_BASE_URL "$LLM_BASE_URL"
-echo -e "  ${GREEN}✅ LLM: ${LLM_PROVIDER} / ${LLM_MODEL}${NC}"
+      LLM_MODEL="${LLM_MODEL:-gpt-5.4-mini}"
+      # Reuse as OPENAI_API_KEY for vision/transcription too
+      OPENAI_API_KEY="$LLM_API_KEY"
+      set_env OPENAI_API_KEY "$OPENAI_API_KEY"
+      ;;
+    openrouter)
+      if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
+        ask "LLM_API_KEY" "OpenRouter API Key (from openrouter.ai/keys)" "" 1
+      fi
+      LLM_MODEL="${LLM_MODEL:-anthropic/claude-sonnet-4-6}"
+      ;;
+    ollama)
+      if [ -z "$LLM_BASE_URL" ] || [[ "$LLM_BASE_URL" == "your_"* ]]; then
+        # Detect OS for Docker networking default
+        if [[ "$(uname -s)" == "Linux" ]]; then
+          OLLAMA_DEFAULT="http://172.17.0.1:11434"
+        else
+          OLLAMA_DEFAULT="http://host.docker.internal:11434"
+        fi
+        read -rp "  Ollama Base URL [${OLLAMA_DEFAULT}]: " LLM_BASE_URL_INPUT
+        LLM_BASE_URL="${LLM_BASE_URL_INPUT:-$OLLAMA_DEFAULT}"
+      fi
+      LLM_API_KEY="${LLM_API_KEY:-ollama}"
+      LLM_MODEL="${LLM_MODEL:-llama3.2}"
+      ;;
+    deepseek)
+      if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
+        ask "LLM_API_KEY" "DeepSeek API Key (from platform.deepseek.com)" "" 1
+      fi
+      LLM_MODEL="${LLM_MODEL:-deepseek-chat}"
+      ;;
+    gemini)
+      if [ -z "$LLM_API_KEY" ] || [[ "$LLM_API_KEY" == "your_"* ]]; then
+        ask "LLM_API_KEY" "Google Gemini API Key (from aistudio.google.com)" "" 1
+      fi
+      LLM_MODEL="${LLM_MODEL:-models/gemini-2.5-flash}"
+      ;;
+    openai_compatible)
+      if [ -z "$LLM_BASE_URL" ] || [[ "$LLM_BASE_URL" == "your_"* ]]; then
+        read -rp "  Base URL (e.g. http://localhost:8080/v1): " LLM_BASE_URL
+      fi
+      read -rp "  API Key (Enter to skip if not needed): " LLM_API_KEY_INPUT
+      LLM_API_KEY="${LLM_API_KEY_INPUT:-not-needed}"
+      read -rp "  Model name: " LLM_MODEL
+      ;;
+  esac
+  set_env LLM_API_KEY "$LLM_API_KEY"
+  set_env LLM_MODEL "$LLM_MODEL"
+  [ -n "$LLM_BASE_URL" ] && set_env LLM_BASE_URL "$LLM_BASE_URL"
+  echo -e "  ${GREEN}✅ LLM: ${LLM_PROVIDER} / ${LLM_MODEL}${NC}"
+else
+  echo -e "  ${GREEN}✅ LLM: ${LLM_PROVIDER} / ${LLM_MODEL} (unchanged)${NC}"
+fi
 
 # OpenAI is optional (for vision + voice) — skip if already set above (OpenAI provider)
 if [ "$LLM_PROVIDER" != "openai" ]; then
