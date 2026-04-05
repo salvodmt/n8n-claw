@@ -114,10 +114,11 @@ Internal Services:
 ### What you need
 
 - A Linux VPS (Ubuntu 22.04/24.04 recommended, also tested with Debian 13, 4GB RAM and 15GB Disk minimum)
-- A **Telegram Bot** — create one via [@BotFather](https://t.me/BotFather)
-- Your **Telegram Chat ID** — get it from [@userinfobot](https://t.me/userinfobot)
-- An **LLM API Key** — setup lets you choose: Anthropic (default), OpenAI, OpenRouter, DeepSeek, Google Gemini, Mistral, or Ollama (local, no key needed)
-- A **domain name** (optional but recommended, required for Telegram HTTPS webhooks)
+- A **Telegram Bot Token** — open [@BotFather](https://t.me/BotFather) in Telegram, send `/newbot`, follow the prompts, and copy the token it gives you
+- Your **Telegram Chat ID** — send any message to [@userinfobot](https://t.me/userinfobot) and it replies with your numeric ID
+- An **LLM API Key** — setup lets you choose your provider:
+  - [Anthropic](https://console.anthropic.com/settings/keys) (default) · [OpenAI](https://platform.openai.com/api-keys) · [OpenRouter](https://openrouter.ai/keys) · [DeepSeek](https://platform.deepseek.com/api_keys) · [Google Gemini](https://aistudio.google.com/apikey) · [Mistral](https://console.mistral.ai/api-keys) · Ollama (local, no key needed) · any OpenAI-compatible endpoint
+- A **domain name** (optional but recommended, required for Telegram HTTPS webhooks). No domain? You can use [sslip.io](https://sslip.io) — it turns your IP into a domain automatically (e.g. `n8n.123.45.67.89.sslip.io`), no DNS setup needed
 
 ### Step 1 — Clone & run
 
@@ -130,7 +131,7 @@ The script installs everything automatically. It will ask you for:
 - **n8n API Key** — generated in the n8n UI that opens during setup *(Settings → API)*
 - **Telegram Bot Token** + **Chat ID**
 - **LLM API Key** — choose your provider (Anthropic, OpenAI, OpenRouter, DeepSeek, Gemini, Mistral, Ollama, or OpenAI-compatible)
-- **Domain name** *(optional — enables HTTPS via Let's Encrypt)*
+- **Domain name** *(optional — enables HTTPS via Let's Encrypt. Use [sslip.io](https://sslip.io) if you don't have one)*
 - **Agent personality** — name, language, communication style, custom persona
 
 After that, setup handles everything else: Docker, database, credentials, workflows, activation.
@@ -1138,7 +1139,7 @@ If you provided a domain during setup, HTTPS is configured automatically via Let
 DOMAIN=n8n.yourdomain.com ./setup.sh
 ```
 
-Point your domain's DNS A record to the VPS IP before running this.
+Point your domain's DNS A record to the VPS IP before running this. If you don't have a domain, you can use [sslip.io](https://sslip.io) — just use `n8n.<YOUR-IP>.sslip.io` as the domain (e.g. `n8n.123.45.67.89.sslip.io`). No DNS configuration required.
 
 ### Already have a reverse proxy?
 
