@@ -16,6 +16,7 @@ https://github.com/user-attachments/assets/10b7b93d-f482-47c1-a144-80a1b9d1be16
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Services & URLs](#services--urls)
+- [Connect Claude Code, Claude Desktop & Cursor](#connect-claude-code-claude-desktop--cursor)
 - [Webhook API & External Integrations](#webhook-api--external-integrations)
 - [MCP Skills Library](#mcp-skills-library)
 - [Google Services (OAuth2)](#google-services-oauth2)
@@ -210,6 +211,109 @@ ssh -L 3001:localhost:3001 user@YOUR-VPS-IP
 ```
 
 Then open `http://localhost:3001` in your browser. The tunnel stays open as long as the SSH session runs.
+
+</details>
+
+---
+
+<details>
+<summary>
+
+## Connect Claude Code, Claude Desktop & Cursor
+
+</summary>
+
+n8n-claw can be used directly from Claude Code, Claude Desktop, Cursor, and other MCP-compatible tools — using n8n's built-in Instance-Level MCP Server. No extra workflows or code needed.
+
+Once connected, your MCP client can chat with the agent (with full access to memory, web search, skills, reminders, and Telegram), trigger other workflows, and even create new ones.
+
+### Setup
+
+**1. Enable Instance-Level MCP in n8n**
+
+Navigate to **Settings > Instance-level MCP** and toggle **Enable MCP access** (requires admin).
+
+**2. Expose the agent workflow**
+
+Open the **n8n-claw Agent** workflow > click the menu (**...**) > **Settings** > toggle **Available in MCP**.
+
+Optionally add a description to help MCP clients find the workflow (menu > **Edit description**).
+
+**3. Generate an Access Token**
+
+On the Instance-level MCP page, click **Connection details** > **Access Token** tab. Copy your token immediately — it will be masked on future visits.
+
+**4. Connect your MCP client**
+
+<details>
+<summary>Claude Code</summary>
+
+```bash
+claude mcp add --transport http n8n-claw https://<your-n8n-domain>/mcp-server/http \
+  --header "Authorization: Bearer <YOUR_TOKEN>"
+```
+
+Or add to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "n8n-claw": {
+      "type": "http",
+      "url": "https://<your-n8n-domain>/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer <YOUR_TOKEN>"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+**Option A — OAuth2:** Go to **Settings > Connectors** > **Add custom connector**. Enter your n8n base URL as the Remote MCP Server URL. Authorize when prompted.
+
+**Option B — Access Token:** Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "n8n-claw": {
+      "type": "http",
+      "url": "https://<your-n8n-domain>/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer <YOUR_TOKEN>"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Cursor / Other MCP clients</summary>
+
+Use the HTTP endpoint `https://<your-n8n-domain>/mcp-server/http` with a Bearer token header. Refer to your client's MCP documentation for the exact configuration format.
+
+</details>
+
+### Triggering the agent
+
+MCP clients can discover and execute the agent workflow automatically. When triggered, the agent runs its full pipeline — personality, memory, conversation history, AI reasoning with all tools — and returns the response.
+
+Conversations are isolated per source and session, so MCP usage won't interfere with Telegram chats.
+
+### Limitations
+
+- **5-minute timeout** — MCP-triggered executions have a hard 5-minute limit
+- **Text only** — binary inputs (images, files) are not supported via MCP
+- **No client scoping** — all connected MCP clients see the same exposed workflows
+
+> **Requires n8n v2.2+.** Workflow creation/editing requires v2.13+. See [n8n MCP docs](https://docs.n8n.io/advanced-ai/accessing-n8n-mcp-server/) for details.
 
 </details>
 
