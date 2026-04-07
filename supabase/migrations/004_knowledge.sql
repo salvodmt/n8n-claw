@@ -68,7 +68,7 @@ BEGIN
   FROM memory_long ml
   WHERE
     (filter_category IS NULL OR ml.category = filter_category)
-    AND (filter_entity IS NULL OR ml.entity_name = filter_entity)
+    AND (filter_entity IS NULL OR ml.entity_name ILIKE filter_entity)
     AND (filter_tags IS NULL OR ml.tags @> filter_tags)
     AND 1 - (ml.embedding <=> query_embedding) > match_threshold
     AND (ml.expires_at IS NULL OR ml.expires_at > now())
@@ -119,7 +119,7 @@ BEGIN
   FROM memory_long ml
   WHERE
     ml.content ILIKE '%' || search_query || '%'
-    AND (filter_entity IS NULL OR ml.entity_name = filter_entity)
+    AND (filter_entity IS NULL OR ml.entity_name ILIKE filter_entity)
     AND (filter_tags IS NULL OR ml.tags @> filter_tags)
     AND (ml.expires_at IS NULL OR ml.expires_at > now())
   ORDER BY ml.importance DESC, ml.created_at DESC
