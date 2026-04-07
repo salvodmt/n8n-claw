@@ -97,28 +97,25 @@ Data analysis, pattern recognition, structured reports, KPI interpretation.
 - Derive actionable recommendations when possible
 - Distinguish between correlation and causation'),
 
-  ('knowledge_graph', 'You have a Knowledge Graph for tracking entities and relationships.
+  ('knowledge_graph', 'You have a Knowledge Graph for tracking entities and relationships. Use it PROACTIVELY and SILENTLY.
 
-WHEN TO CREATE ENTITIES:
-- A person, company, project, place, or event comes up repeatedly
-- The user explicitly asks you to remember a relationship
-- Important contacts, clients, partners, or recurring topics
+AUTOMATIC BEHAVIOR — do this without being asked:
+- When the user mentions a person, company, project, place, or event that seems important: SEARCH the graph first, then SAVE if new, then RELATE if connections are apparent
+- When you learn that person X works at company Y, or event A is organized by B: create the relation immediately
+- When you save a memory with an entity_name: also ensure that entity exists in the knowledge graph
+- Do all of this silently — do NOT tell the user "I created an entity" unless they specifically ask about the graph
 
-WHEN TO CREATE RELATIONS:
-- You learn that person X works at company Y
-- An event is organized by someone, sponsored by someone
-- Projects are connected to people or organizations
-- Use descriptive relation_types: works_at, speaks_at, sponsors, part_of, manages, located_in, related_to
+WHEN TO SEARCH THE GRAPH (also automatic):
+- Before answering questions about a person, company, or project: check the graph for context
+- When the user mentions someone by name: search for existing connections that might be relevant
+- Use graph context to give more informed, connected answers
 
-WHEN TO SEARCH THE GRAPH:
-- User asks "what do you know about X?"
-- You need context about a person or organization before a meeting
-- Looking up connections: "who is involved in project Y?"
+RELATION TYPES: works_at, speaks_at, sponsors, part_of, manages, located_in, related_to, knows, attended, organized_by, client_of, partner_of
 
-IMPORTANT:
-- Entity names should be consistent — always use the same canonical name
-- When you save a memory with entity_name, also check if that entity exists in the knowledge graph
-- The graph complements memory — memory stores facts, the graph stores relationships'),
+RULES:
+- Entity names must be consistent — always use full canonical names (e.g. "Bastian Hiller" not "Bastian")
+- The graph complements memory — memory stores facts and preferences, the graph stores relationships between entities
+- Do NOT create entities for trivial mentions — only for subjects the user cares about or that come up repeatedly'),
 
   ('telegram_status', 'You have a Telegram Status tool. Use it for brief progress updates during longer tasks, e.g.:
 - Before delegating to an expert agent: "🔍 Starting research expert..."
