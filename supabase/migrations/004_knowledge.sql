@@ -263,7 +263,7 @@ BEGIN
     FROM public.kg_relations r
     WHERE r.source_id = start_id
       AND (r.valid_until IS NULL OR r.valid_until > now())
-    UNION
+    UNION ALL
     -- Hop 1: eingehende Beziehungen
     SELECT r.source_id, 1, r.relation_type, 'incoming'::text
     FROM public.kg_relations r
