@@ -1824,11 +1824,9 @@ USE_FULL_PERSONA=""
 if [ -z "$CUSTOM_PERSONA" ] && [ -n "$EXISTING_CUSTOM_PERSONA" ]; then
   # Keep existing custom persona as-is (it's the full persona string from DB)
   USE_FULL_PERSONA="$EXISTING_CUSTOM_PERSONA"
-  PROACTIVE=""
   echo -e "  ${GREEN}✅ Keeping current custom persona${NC}"
 elif [ -n "$CUSTOM_PERSONA" ]; then
   STYLE="$CUSTOM_PERSONA"
-  PROACTIVE=""
   echo -e "  ${GREEN}✅ Using custom persona${NC}"
 fi
 
