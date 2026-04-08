@@ -47,8 +47,8 @@ Talk to your agent in natural language — it manages tasks, remembers context a
 
 - **Telegram chat** — talk to your AI agent directly via Telegram
 - **Webhook API** — call the agent from any external system via HTTP (Slack, Teams, Paperclip, custom apps)
-- **Long-term memory** — remembers conversations and important context with semantic search, auto-tagging, and auto-expiry
-- **Knowledge graph** — automatically tracks people, companies, projects, and their relationships
+- **Enriched long-term memory** — semantic search with tags, entity tracking, source attribution, and category-based auto-expiry
+- **Knowledge graph** — automatically tracks people, companies, products, and events; multi-hop graph traversal reveals how everything connects
 - **Task management** — create, track, and complete tasks with priorities and due dates
 - **Proactive heartbeat** — automatically reminds you of overdue/urgent tasks
 - **Recurring actions** — repeating tasks on any schedule ("check my emails every 15 minutes", "daily briefing at 8am")
