@@ -14,12 +14,23 @@
 
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
+-- Immutable wrapper for unaccent(): Postgres requires IMMUTABLE expressions
+-- for GENERATED ALWAYS AS ... STORED columns. The built-in unaccent() is
+-- marked STABLE (because it reads the unaccent dictionary), but the dictionary
+-- never changes at runtime, so an IMMUTABLE wrapper is safe and widely used.
+CREATE OR REPLACE FUNCTION public.immutable_unaccent(text)
+RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT
+AS $func$
+  SELECT public.unaccent('public.unaccent', $1)
+$func$;
+
 
 -- ============================================================
 -- 2. GENERATED tsvector COLUMN on memory_long
 -- ============================================================
 -- Combines content + entity_name for full-text search.
--- Uses 'simple' config (no language-specific stemming) + unaccent for
+-- Uses 'simple' config (no language-specific stemming) + immutable_unaccent for
 -- language-agnostic matching: München ↔ muenchen, résumé ↔ resume.
 -- GENERATED ALWAYS AS ... STORED: Postgres auto-maintains this column.
 -- Existing rows get their search_vector computed immediately on ALTER.
@@ -40,7 +51,7 @@ BEGIN
     ALTER TABLE public.memory_long
       ADD COLUMN search_vector tsvector
       GENERATED ALWAYS AS (
-        to_tsvector('simple', unaccent(coalesce(content, '') || ' ' || coalesce(entity_name, '')))
+        to_tsvector('simple', public.immutable_unaccent(coalesce(content, '') || ' ' || coalesce(entity_name, '')))
       ) STORED;
   END IF;
 END
