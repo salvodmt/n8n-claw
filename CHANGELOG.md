@@ -5,6 +5,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.2.2] — 2026-04-10
+
+### New Skill: DZT Germany Tourism
+
+First skill in the new **Tourism** category. Proxies the Deutsche Zentrale für Tourismus (DZT) MCP Server via One.Intelligence — no API key needed.
+
+### Added
+- **New skill: DZT Germany Tourism** — search German tourism data: POIs (museums, castles, landmarks), events (festivals, markets), hiking/cycling trails, and entity details. Uses MCP Streamable HTTP transport to proxy the DZT server at `destination.one`. Tools: `get_pois_by_criteria`, `get_events_by_criteria`, `get_trails_by_criteria`, `get_entity_details`.
+- **New category: `tourism`** — template catalog gained a dedicated category for tourism and travel skills.
+
+### Changed
+- **CDN hash** updated to `03b490c` in Library Manager for the new template.
+
+### Upgrade from v1.2.1
+```bash
+cd n8n-claw && git pull && ./setup.sh --force
+```
+Then install the new skill via chat:
+- `install dzt-germany-tourism` — no credentials needed
+
+---
+
 ## [1.2.1] — 2026-04-10
 
 ### Token Optimization
