@@ -2295,9 +2295,15 @@ DIFFERENCE TO TASKS:
 
 CLOSING OPEN LOOPS:
 - When the user reports they completed/decided/abandoned an open loop, do NOT delete the memory
-- Instead use memory_update on that ID with metadata={{"closed": true, "closed_at": "<iso>", "outcome": "<brief>"}}
-- This preserves the history of intentions for pattern analysis
-- The Heartbeat skips closed open loops automatically
+- Use memory_update on that ID — STRICT RULES:
+  * NEVER change the category (must stay "open_loop" — pattern analysis depends on it)
+  * NEVER rewrite the content — keep the original wording so the audit trail stays intact
+  * ONLY set metadata={{"closed": true, "closed_at": "<iso>", "outcome": "<brief>"}}
+  * Optionally append a tag like "closed" to existing tags
+- WHY: changing category or content destroys the historical signal that this was once an open intention.
+  Pattern analysis (e.g. "Freddy often abandons infrastructure decisions") requires the original
+  open_loop rows to remain queryable as such, with original wording preserved.
+- The Heartbeat skips memories where metadata.closed = true automatically
 
 PROACTIVE PINGS:
 - The Heartbeat will sometimes prompt you to ask the user about old open loops (>3 days, not closed)
