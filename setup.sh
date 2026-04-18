@@ -1343,8 +1343,28 @@ IMPORT_ORDER="error-notification mcp-client reminder-factory reminder-runner mcp
 N8N_SETTINGS_WHITELIST="saveExecutionProgress,saveManualExecutions,saveDataErrorExecution,saveDataSuccessExecution,executionTimeout,errorWorkflow,timezone,executionOrder,callerPolicy,callerIds,timeSavedPerExecution,availableInMCP"
 
 # Fetch existing workflows once (for upsert: update if exists, create if not)
-EXISTING_WFS=$(curl -s "${N8N_BASE}/api/v1/workflows?limit=100" \
-  -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+# Paginate via cursor — n8n API caps limit at 100. Without pagination, workflows
+# beyond the first 100 are missed → --force creates duplicates instead of replacing,
+# leaving orphaned webhook_entity rows that block re-activation.
+EXISTING_WFS=$(python3 - <<PYEOF
+import urllib.request, ssl, json
+ctx = ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
+all_wfs = []
+cursor = None
+while True:
+    url = "${N8N_BASE}/api/v1/workflows?limit=100"
+    if cursor: url += f"&cursor={cursor}"
+    req = urllib.request.Request(url, headers={"X-N8N-API-KEY": "${N8N_API_KEY}"})
+    try:
+        page = json.loads(urllib.request.urlopen(req, context=ctx).read())
+    except Exception as e:
+        break
+    all_wfs.extend(page.get("data", []))
+    cursor = page.get("nextCursor")
+    if not cursor: break
+print(json.dumps({"data": all_wfs}))
+PYEOF
+)
 
 for name in $IMPORT_ORDER; do
   f="workflows/deployed/${name}.json"
@@ -1367,6 +1387,11 @@ for wf in data.get('data', []):
       # associations. PUT preserves existing associations but cannot create
       # new ones — so workflows that were first imported with invalid
       # credential IDs (placeholders) would never get credentials via PUT.
+      # Deactivate first so n8n cleans up webhook_entity rows — DELETE on an
+      # active workflow can leave orphaned webhook registrations that block
+      # the new workflow's activation with "webhook conflict" errors.
+      curl -s -X POST "${N8N_BASE}/api/v1/workflows/${existing_id}/deactivate" \
+        -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
       curl -s -X DELETE "${N8N_BASE}/api/v1/workflows/${existing_id}" \
         -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null
       resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
@@ -1676,9 +1701,14 @@ fi
 # Activate Reminder Runner (polls DB every minute for due reminders)
 REMINDER_RUNNER_ID=${WF_IDS['reminder-runner']}
 if [ -n "$REMINDER_RUNNER_ID" ]; then
-  curl -s -X POST "${N8N_BASE}/api/v1/workflows/${REMINDER_RUNNER_ID}/activate" \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
-  echo -e "  ${GREEN}✅ Reminder Runner workflow activated${NC}"
+  RR_RESP=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows/${REMINDER_RUNNER_ID}/activate" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+  RR_ERR=$(echo "$RR_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message',''))" 2>/dev/null)
+  if [ -z "$RR_ERR" ]; then
+    echo -e "  ${GREEN}✅ Reminder Runner workflow activated${NC}"
+  else
+    echo -e "  ${YELLOW}⚠️  Reminder Runner activation: ${RR_ERR}${NC}"
+  fi
 fi
 
 # Activate sub-workflows (required since n8n 2.x)
@@ -1694,9 +1724,14 @@ echo -e "  ${GREEN}✅ Sub-workflows activated${NC}"
 # Activate Heartbeat AFTER sub-workflows (heartbeat references background-checker)
 HEARTBEAT_ID=${WF_IDS['heartbeat']}
 if [ -n "$HEARTBEAT_ID" ]; then
-  curl -s -X POST "${N8N_BASE}/api/v1/workflows/${HEARTBEAT_ID}/activate" \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
-  echo -e "  ${GREEN}✅ Heartbeat workflow activated${NC}"
+  HB_RESP=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows/${HEARTBEAT_ID}/activate" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+  HB_ERR=$(echo "$HB_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message',''))" 2>/dev/null)
+  if [ -z "$HB_ERR" ]; then
+    echo -e "  ${GREEN}✅ Heartbeat workflow activated${NC}"
+  else
+    echo -e "  ${YELLOW}⚠️  Heartbeat activation: ${HB_ERR}${NC}"
+  fi
 fi
 
 # Activate Webhook Adapter — safe regardless of chat channel choice.
@@ -2273,6 +2308,43 @@ UPDATING AND CLEANING:
 - Remove obsolete memories: if clearly wrong or outdated, delete it
 - Never ask for information you have already saved'),
 
+  ('open_loops', 'OPEN LOOPS — track unfinished intentions
+
+When the user mentions an intention that is NOT immediately done and is NOT a hard task with a deadline, save it as an open loop:
+- "ich muss noch X prüfen" / "I still need to check X"
+- "vergiss nicht Y" / "remind me about Y"
+- "irgendwann sollte ich Z" / "I should Z at some point"
+- "vielleicht sollten wir A nochmal anschauen" / "maybe we should revisit A"
+
+HOW TO SAVE:
+- Use memory_save with category=''open_loop''
+- importance: 6-8 (8 if user sounds concerned, 6 if casual)
+- tags: include ''open_loop'' plus topic keywords
+- entity_name: the main subject if applicable
+- expires_at: optional soft deadline ISO 8601 (only set if user implied a timeframe like "until next week")
+
+DIFFERENCE TO TASKS:
+- Tasks have explicit deadlines and clear completion criteria — use Task Manager
+- Open loops are vague intentions, half-formed thoughts, things to revisit — use memory_save with category=open_loop
+- When in doubt → open_loop (lighter weight, no task list pollution)
+
+CLOSING OPEN LOOPS:
+- When the user reports they completed/decided/abandoned an open loop, do NOT delete the memory
+- Use memory_update on that ID — STRICT RULES:
+  * NEVER change the category (must stay "open_loop" — pattern analysis depends on it)
+  * NEVER rewrite the content — keep the original wording so the audit trail stays intact
+  * ONLY set metadata={{"closed": true, "closed_at": "<iso>", "outcome": "<brief>"}}
+  * Optionally append a tag like "closed" to existing tags
+- WHY: changing category or content destroys the historical signal that this was once an open intention.
+  Pattern analysis (e.g. "Freddy often abandons infrastructure decisions") requires the original
+  open_loop rows to remain queryable as such, with original wording preserved.
+- The Heartbeat skips memories where metadata.closed = true automatically
+
+PROACTIVE PINGS:
+- The Heartbeat will sometimes prompt you to ask the user about old open loops (>3 days, not closed)
+- When that happens, ask gently — "Vor X Tagen wolltest du Y prüfen — wie ist da der Stand?"
+- If the user replies that it''s done/abandoned → close the memory as described above'),
+
   ('task_management', 'You can manage tasks for the user via the Task Manager tool.
 
 IMPORTANT - REMINDERS AND TASKS:
@@ -2453,7 +2525,8 @@ PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U postgres -d postgres -c "
 INSERT INTO public.heartbeat_config (check_name, config, interval_minutes, enabled)
 VALUES
   ('heartbeat', '{\"min_interval_hours\": 2}', 15, false),
-  ('morning_briefing', '{}', 1440, false)
+  ('morning_briefing', '{}', 1440, false),
+  ('open_loop_check', '{\"min_interval_hours\": 24, \"min_age_days\": 3}', 15, true)
 ON CONFLICT (check_name) DO NOTHING;
 " 2>/dev/null
 
