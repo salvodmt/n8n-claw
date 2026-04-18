@@ -1343,8 +1343,28 @@ IMPORT_ORDER="error-notification mcp-client reminder-factory reminder-runner mcp
 N8N_SETTINGS_WHITELIST="saveExecutionProgress,saveManualExecutions,saveDataErrorExecution,saveDataSuccessExecution,executionTimeout,errorWorkflow,timezone,executionOrder,callerPolicy,callerIds,timeSavedPerExecution,availableInMCP"
 
 # Fetch existing workflows once (for upsert: update if exists, create if not)
-EXISTING_WFS=$(curl -s "${N8N_BASE}/api/v1/workflows?limit=100" \
-  -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+# Paginate via cursor — n8n API caps limit at 100. Without pagination, workflows
+# beyond the first 100 are missed → --force creates duplicates instead of replacing,
+# leaving orphaned webhook_entity rows that block re-activation.
+EXISTING_WFS=$(python3 - <<PYEOF
+import urllib.request, ssl, json
+ctx = ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
+all_wfs = []
+cursor = None
+while True:
+    url = "${N8N_BASE}/api/v1/workflows?limit=100"
+    if cursor: url += f"&cursor={cursor}"
+    req = urllib.request.Request(url, headers={"X-N8N-API-KEY": "${N8N_API_KEY}"})
+    try:
+        page = json.loads(urllib.request.urlopen(req, context=ctx).read())
+    except Exception as e:
+        break
+    all_wfs.extend(page.get("data", []))
+    cursor = page.get("nextCursor")
+    if not cursor: break
+print(json.dumps({"data": all_wfs}))
+PYEOF
+)
 
 for name in $IMPORT_ORDER; do
   f="workflows/deployed/${name}.json"
@@ -1367,6 +1387,11 @@ for wf in data.get('data', []):
       # associations. PUT preserves existing associations but cannot create
       # new ones — so workflows that were first imported with invalid
       # credential IDs (placeholders) would never get credentials via PUT.
+      # Deactivate first so n8n cleans up webhook_entity rows — DELETE on an
+      # active workflow can leave orphaned webhook registrations that block
+      # the new workflow's activation with "webhook conflict" errors.
+      curl -s -X POST "${N8N_BASE}/api/v1/workflows/${existing_id}/deactivate" \
+        -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
       curl -s -X DELETE "${N8N_BASE}/api/v1/workflows/${existing_id}" \
         -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null
       resp=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows" \
@@ -1676,9 +1701,14 @@ fi
 # Activate Reminder Runner (polls DB every minute for due reminders)
 REMINDER_RUNNER_ID=${WF_IDS['reminder-runner']}
 if [ -n "$REMINDER_RUNNER_ID" ]; then
-  curl -s -X POST "${N8N_BASE}/api/v1/workflows/${REMINDER_RUNNER_ID}/activate" \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
-  echo -e "  ${GREEN}✅ Reminder Runner workflow activated${NC}"
+  RR_RESP=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows/${REMINDER_RUNNER_ID}/activate" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+  RR_ERR=$(echo "$RR_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message',''))" 2>/dev/null)
+  if [ -z "$RR_ERR" ]; then
+    echo -e "  ${GREEN}✅ Reminder Runner workflow activated${NC}"
+  else
+    echo -e "  ${YELLOW}⚠️  Reminder Runner activation: ${RR_ERR}${NC}"
+  fi
 fi
 
 # Activate sub-workflows (required since n8n 2.x)
@@ -1694,9 +1724,14 @@ echo -e "  ${GREEN}✅ Sub-workflows activated${NC}"
 # Activate Heartbeat AFTER sub-workflows (heartbeat references background-checker)
 HEARTBEAT_ID=${WF_IDS['heartbeat']}
 if [ -n "$HEARTBEAT_ID" ]; then
-  curl -s -X POST "${N8N_BASE}/api/v1/workflows/${HEARTBEAT_ID}/activate" \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
-  echo -e "  ${GREEN}✅ Heartbeat workflow activated${NC}"
+  HB_RESP=$(curl -s -X POST "${N8N_BASE}/api/v1/workflows/${HEARTBEAT_ID}/activate" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+  HB_ERR=$(echo "$HB_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message',''))" 2>/dev/null)
+  if [ -z "$HB_ERR" ]; then
+    echo -e "  ${GREEN}✅ Heartbeat workflow activated${NC}"
+  else
+    echo -e "  ${YELLOW}⚠️  Heartbeat activation: ${HB_ERR}${NC}"
+  fi
 fi
 
 # Activate Webhook Adapter — safe regardless of chat channel choice.
